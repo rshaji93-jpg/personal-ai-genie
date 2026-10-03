@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useRef } from "react";
 
-// Hardcoded fallback guarantees it never calls localhost or Vercel root by mistake
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "https://personal-ai-canvas.onrender.com";
+
+// ⚠️ Put your WhatsApp number here (country code + number, no + sign)
+const ADMIN_WHATSAPP_NUMBER = "919941692622";
 
 interface Message {
   role: "user" | "model";
@@ -22,6 +24,14 @@ export default function PersonalAICanvas() {
   const [verifying, setVerifying] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Helper to open WhatsApp with prefilled message
+  const reportIssueViaWhatsApp = (context: string) => {
+    const text = encodeURIComponent(
+      `Hi! I'm using the AI Canvas and ran into an issue:\n\n[Details]: ${context}\n[Device]: ${deviceId || "unknown"}`
+    );
+    window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${text}`, "_blank");
+  };
 
   // Set up persistent device identifier
   useEffect(() => {
@@ -68,7 +78,7 @@ export default function PersonalAICanvas() {
       });
 
       if (!res.ok) {
-        throw new Error("Invalid passcode or limit reached.");
+        throw new Error("Invalid passcode or invite limit reached.");
       }
 
       setInviteToken(tokenToTest.trim());
@@ -190,12 +200,28 @@ export default function PersonalAICanvas() {
           </form>
 
           {errorMessage && (
-            <p className="mt-4 text-xs text-red-400 bg-red-950/40 border border-red-900/60 rounded-lg p-2.5">
-              {errorMessage}
-            </p>
+            <div className="mt-4 text-xs text-red-400 bg-red-950/40 border border-red-900/60 rounded-lg p-2.5 space-y-2">
+              <p>{errorMessage}</p>
+              <button
+                type="button"
+                onClick={() => reportIssueViaWhatsApp(`Passcode failed: ${errorMessage}`)}
+                className="text-xs text-emerald-400 hover:text-emerald-300 underline font-medium inline-block"
+              >
+                Report this issue to Admin on WhatsApp →
+              </button>
+            </div>
           )}
 
-          <p className="text-xs text-slate-500 mt-6">Authorized for friends & family beta members only.</p>
+          <div className="mt-6 pt-4 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-500">
+            <span>Beta v1.0</span>
+            <button
+              type="button"
+              onClick={() => reportIssueViaWhatsApp("Need help with login/passcode")}
+              className="text-slate-400 hover:text-white transition"
+            >
+              Need help?
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -209,9 +235,18 @@ export default function PersonalAICanvas() {
           <span className="text-2xl">✨</span>
           <span className="font-semibold text-lg text-white">Personal AI Canvas</span>
         </div>
-        <span className="text-xs px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-mono">
-          ✓ Connected
-        </span>
+        <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => reportIssueViaWhatsApp("Feedback from inside Canvas session")}
+            className="text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition"
+          >
+            💬 Report Issue
+          </button>
+          <span className="text-xs px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-mono">
+            ✓ Connected
+          </span>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4 max-w-3xl w-full mx-auto">
