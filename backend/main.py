@@ -1,184 +1,106 @@
 import os
-import base64
-import httpx
-from typing import Optional, Set
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Header
+import json
+from typing import Optional, List
+from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
 
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise RuntimeError("GEMINI_API_KEY is not set in .env")
-
-client = genai.Client(api_key=api_key)
-
-CANDIDATE_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
-    "gemini-3.7-flash",
-    "gemini-3.8-flash-lite",
-    "gemini-flash-latest"
-]
-
-# --- WhatsApp Circle Security Configuration ---
-VALID_INVITE_TOKEN = os.getenv("WHATSAPP_INVITE_TOKEN", "FAMILY_CIRCLE_2026")
-MAX_ALLOWED_DEVICES = 20
-registered_devices: Set[str] = set()
-
 app = FastAPI(title="Personal AI Canvas API")
 
+# Allow requests from your Vercel frontend, local development, and preview deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://personal-ai-canvas.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+WHATSAPP_INVITE_TOKEN = os.getenv("WHATSAPP_INVITE_TOKEN", "FAMILY_CIRCLE_2026")
 
-class UserProfile(BaseModel):
-    name: str = "User"
-    age: int = 20
-    is_student: bool = False
-    profession: Optional[str] = "Software Developer"
-    grade_class: Optional[str] = "Undergraduate"
-    interests: Optional[str] = "AI & Technology"
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+
+class TokenVerifyRequest(BaseModel):
+    token: Optional[str] = None
+    passcode: Optional[str] = None
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
 
 
 class ChatRequest(BaseModel):
-    profile: Optional[UserProfile] = None
-    role_mode: str = "professional"
-    message: str
-    image_base64: Optional[str] = None
-    image_mime_type: Optional[str] = "image/jpeg"
-    invite_token: Optional[str] = None
-    device_id: Optional[str] = None
-
-
-async def fetch_live_job_openings() -> str:
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as http_client:
-            res = await http_client.get(
-                "https://hn.algolia.com/api/v1/search_by_date?tags=job&hitsPerPage=6"
-            )
-            if res.status_code == 200:
-                data = res.json()
-                hits = data.get("hits", [])
-                openings = []
-                for h in hits:
-                    title = h.get("title") or "Open Role"
-                    story_text = h.get("story_text") or h.get("url") or ""
-                    clean_desc = story_text[:250].replace("\n", " ")
-                    openings.append(f"- **{title}**: {clean_desc}")
-                return "\n".join(openings) if openings else "No current openings found."
-    except Exception as e:
-        return f"Fetch fallback notice: {str(e)}"
-    return "Recent openings unavailable."
+    prompt: str
+    history: Optional[List[ChatMessage]] = []
 
 
 @app.get("/")
-def health_check():
-    return {"status": "online", "active_devices": len(registered_devices)}
+async def root():
+    return {
+        "status": "online",
+        "service": "Personal AI Canvas Backend",
+        "version": "1.0.0",
+    }
 
 
+# Dual route support fixes the 404 error regardless of frontend pathing
 @app.post("/api/verify-token")
-def verify_token(payload: dict):
-    token = payload.get("invite_token")
-    device_id = payload.get("device_id")
+@app.post("/verify-token")
+async def verify_token(payload: TokenVerifyRequest):
+    provided = payload.token or payload.passcode
+    if not provided:
+        raise HTTPException(status_code=400, detail="Token or passcode is required")
 
-    if token != VALID_INVITE_TOKEN:
-        raise HTTPException(status_code=403, detail="Invalid WhatsApp invite link.")
+    if provided.strip() == WHATSAPP_INVITE_TOKEN.strip():
+        return {"valid": True, "message": "Access granted"}
 
-    if device_id not in registered_devices:
-        if len(registered_devices) >= MAX_ALLOWED_DEVICES:
-            raise HTTPException(
-                status_code=403, 
-                detail="Invite capacity reached. This private link has exceeded maximum shares."
-            )
-        if device_id:
-            registered_devices.add(device_id)
-
-    return {"status": "authorized", "token": token}
+    raise HTTPException(status_code=401, detail="Invalid passcode or limit reached")
 
 
 @app.post("/api/chat")
-async def handle_chat_stream(req: ChatRequest):
-    # Verify invite gate
-    if req.invite_token != VALID_INVITE_TOKEN:
-        raise HTTPException(status_code=403, detail="Unauthorized: Valid WhatsApp invite required.")
+@app.post("/chat")
+async def chat(request: ChatRequest, x_invite_token: Optional[str] = Header(None)):
+    # Validate authorization header if passed
+    if x_invite_token and x_invite_token.strip() != WHATSAPP_INVITE_TOKEN.strip():
+        raise HTTPException(status_code=403, detail="Unauthorized session token")
 
-    user_msg = req.message
-    profile = req.profile or UserProfile()
+    if not client:
+        raise HTTPException(status_code=500, detail="Gemini API key is not configured on server")
 
-    if "scan target job openings" in user_msg.lower():
-        live_data = await fetch_live_job_openings()
-        user_msg = (
-            f"The user clicked 'Scan target job openings'. Here is the live data feed:\n\n"
-            f"{live_data}\n\n"
-            f"Analyze these openings specifically for {profile.name}, who specializes in '{profile.profession or profile.interests}'. "
-            "List matching roles, core tech requirements, and personalized application pitches."
-        )
-
-    if req.role_mode == "student" or profile.is_student:
-        system_instruction = (
-            f"You are a personalized interactive tutor and study architect for {profile.name}. "
-            f"They are currently studying at the level/class of '{profile.grade_class}' with primary interests in '{profile.interests}'. "
-            "Calibrate all explanations, quizzes, and OCR extractions precisely to their level."
-        )
-    else:
-        system_instruction = (
-            f"You are a personalized developer copilot and career mentor for {profile.name}. "
-            f"Their professional domain is '{profile.profession}', with interests in '{profile.interests}'. "
-            "Provide concise, high-grade technical feedback and workflow automation guidance."
-        )
-
-    contents_payload = []
-    if req.image_base64:
+    async def generate_stream():
         try:
-            raw_bytes = base64.b64decode(req.image_base64)
-            contents_payload.append(
-                types.Part.from_bytes(
-                    data=raw_bytes,
-                    mime_type=req.image_mime_type or "image/jpeg"
-                )
+            # Build conversation history
+            contents = []
+            for msg in request.history:
+                role = "user" if msg.role == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
+            contents.append(types.Content(role="user", parts=[types.Part.from_text(text=request.prompt)]))
+
+            response = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=contents,
             )
-        except Exception as err:
-            print(f"Image decode error: {err}")
 
-    prompt_text = user_msg if user_msg.strip() else "Extract and format this document clearly."
-    contents_payload.append(prompt_text)
+            for chunk in response:
+                if chunk.text:
+                    yield f"data: {json.dumps({'text': chunk.text})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
 
-    def stream_generator():
-        stream_started = False
-        for model_name in CANDIDATE_MODELS:
-            try:
-                for chunk in client.models.generate_content_stream(
-                    model=model_name,
-                    contents=contents_payload,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.4,
-                    ),
-                ):
-                    if chunk.text:
-                        stream_started = True
-                        yield chunk.text
-                if stream_started:
-                    return
-            except Exception as e:
-                print(f"Model {model_name} busy: {e}. Trying fallback...")
-                if stream_started:
-                    yield f"\n[Stream interrupted: {e}]"
-                    return
-                continue
-
-        if not stream_started:
-            yield "All models are currently experiencing high demand. Please try again shortly."
-
-    return StreamingResponse(stream_generator(), media_type="text/plain")
+    return StreamingResponse(generate_stream(), media_type="text/event-stream")
