@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException, Request, Header
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ load_dotenv()
 
 app = FastAPI(title="Personal AI Canvas API")
 
-# Allow requests from your Vercel frontend, local development, and preview deployments
+# Allow requests from your Vercel frontend, preview builds, and local development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -36,6 +36,8 @@ client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 class TokenVerifyRequest(BaseModel):
     token: Optional[str] = None
     passcode: Optional[str] = None
+    invite_token: Optional[str] = None
+    device_id: Optional[str] = None
 
 
 class ChatMessage(BaseModel):
@@ -57,11 +59,11 @@ async def root():
     }
 
 
-# Dual route support fixes the 404 error regardless of frontend pathing
+# Dual-route endpoint accepting token, passcode, or invite_token
 @app.post("/api/verify-token")
 @app.post("/verify-token")
 async def verify_token(payload: TokenVerifyRequest):
-    provided = payload.token or payload.passcode
+    provided = payload.invite_token or payload.token or payload.passcode
     if not provided:
         raise HTTPException(status_code=400, detail="Token or passcode is required")
 
@@ -74,7 +76,6 @@ async def verify_token(payload: TokenVerifyRequest):
 @app.post("/api/chat")
 @app.post("/chat")
 async def chat(request: ChatRequest, x_invite_token: Optional[str] = Header(None)):
-    # Validate authorization header if passed
     if x_invite_token and x_invite_token.strip() != WHATSAPP_INVITE_TOKEN.strip():
         raise HTTPException(status_code=403, detail="Unauthorized session token")
 
@@ -83,7 +84,6 @@ async def chat(request: ChatRequest, x_invite_token: Optional[str] = Header(None
 
     async def generate_stream():
         try:
-            # Build conversation history
             contents = []
             for msg in request.history:
                 role = "user" if msg.role == "user" else "model"
