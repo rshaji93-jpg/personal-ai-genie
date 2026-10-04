@@ -33,7 +33,8 @@ import {
   MessageCircleQuestion,
   SendHorizontal,
   Camera,
-  Monitor
+  Monitor,
+  Activity
 } from "lucide-react";
 
 interface Message {
@@ -64,6 +65,66 @@ interface UserProfile {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://personal-ai-canvas.onrender.com";
 
+// Formatter for rich code snippets and bold text
+function RichTextContent({ content }: { content: string }) {
+  const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+
+  const copyCode = (codeText: string, id: string) => {
+    navigator.clipboard.writeText(codeText);
+    setCopiedSnippet(id);
+    setTimeout(() => setCopiedSnippet(null), 2000);
+  };
+
+  const parts = content.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-2 text-xs sm:text-sm leading-relaxed">
+      {parts.map((part, idx) => {
+        if (part.startsWith("```") && part.endsWith("```")) {
+          const lines = part.slice(3, -3).trim().split("\n");
+          const firstLine = lines[0].trim();
+          const hasLang = /^[a-zA-Z0-9_-]+$/.test(firstLine);
+          const lang = hasLang ? firstLine : "code";
+          const codeBody = hasLang ? lines.slice(1).join("\n") : lines.join("\n");
+          const snippetId = `snippet_${idx}`;
+
+          return (
+            <div key={idx} className="my-2 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 text-slate-100 shadow-md">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800/90 text-[11px] font-mono text-slate-300 border-b border-slate-700">
+                <span className="uppercase text-[10px] tracking-wide font-semibold text-sky-400">{lang}</span>
+                <button
+                  type="button"
+                  onClick={() => copyCode(codeBody, snippetId)}
+                  className="flex items-center gap-1 hover:text-white transition-colors p-1"
+                >
+                  {copiedSnippet === snippetId ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" /> Copy Code
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="p-3 overflow-x-auto text-[11px] sm:text-xs font-mono leading-relaxed text-sky-100">
+                <code>{codeBody}</code>
+              </pre>
+            </div>
+          );
+        }
+
+        return (
+          <span key={idx} className="whitespace-pre-wrap">
+            {part}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PersonalAICanvas() {
   const [mode, setMode] = useState<"professional" | "student">("professional");
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -81,6 +142,9 @@ export default function PersonalAICanvas() {
   const [reportDescription, setReportDescription] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
+
+  // Cold Start Buffer Status
+  const [serverWarming, setServerWarming] = useState(false);
 
   // Profile State
   const [profile, setProfile] = useState<UserProfile>({
@@ -117,7 +181,7 @@ export default function PersonalAICanvas() {
 
   const currentMessages = mode === "professional" ? profMessages : studentMessages;
 
-  // 1. Gatekeeper: Validate token & device
+  // 1. Gatekeeper & Cold-Start Ping
   useEffect(() => {
     let deviceId = localStorage.getItem("canvas_device_id");
     if (!deviceId) {
@@ -129,6 +193,17 @@ export default function PersonalAICanvas() {
     const tokenFromUrl = urlParams.get("invite");
     const storedToken = localStorage.getItem("canvas_invite_token");
     const activeToken = tokenFromUrl || storedToken;
+
+    // Check cold-start latency
+    const pingStart = Date.now();
+    fetch(`${BACKEND_URL}/health`)
+      .then(() => {
+        if (Date.now() - pingStart > 2000) {
+          setServerWarming(true);
+          setTimeout(() => setServerWarming(false), 5000);
+        }
+      })
+      .catch(() => {});
 
     if (activeToken) {
       fetch(`${BACKEND_URL}/api/verify-token`, {
@@ -350,7 +425,7 @@ export default function PersonalAICanvas() {
       const base64String = (reader.result as string).split(",")[1];
       setSelectedFile({
         base64: base64String,
-        mimeType: file.type || "image/jpeg",
+        mimeType: file.type || "application/pdf",
         name: file.name
       });
       setMenuOpen(false);
@@ -358,7 +433,7 @@ export default function PersonalAICanvas() {
     reader.readAsDataURL(file);
   };
 
-  // Instant Desktop Screen / Window Snapshot
+  // Instant Desktop Screen Snapshot
   const handleCaptureScreen = async () => {
     setMenuOpen(false);
     if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
@@ -485,6 +560,10 @@ export default function PersonalAICanvas() {
           profile: profile,
           role_mode: mode,
           message: textToSend,
+          history: currentMessages.map((m) => ({
+            sender: m.sender,
+            text: m.text,
+          })),
           image_base64: filePayload ? filePayload.base64 : null,
           image_mime_type: filePayload ? filePayload.mimeType : "image/jpeg",
           invite_token: inviteToken,
@@ -589,7 +668,6 @@ export default function PersonalAICanvas() {
     }
   };
 
-  // ACCESS DENIED MODAL (If unauthorized)
   if (accessDenied && !inviteToken) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-b from-[#7ec5f9] via-[#bce3f9] to-[#f4f7d8] p-4">
@@ -631,7 +709,6 @@ export default function PersonalAICanvas() {
           </div>
         </div>
 
-        {/* In-App Report Dialog inside Lock screen */}
         {reportModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-sky-100 space-y-4">
@@ -677,7 +754,6 @@ export default function PersonalAICanvas() {
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-gradient-to-b from-[#7ec5f9] via-[#bce3f9] to-[#f4f7d8]">
-      {/* File Upload Hidden Input */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -686,7 +762,6 @@ export default function PersonalAICanvas() {
         className="hidden" 
       />
 
-      {/* Direct Mobile Camera / Video Capture Input */}
       <input 
         type="file" 
         ref={cameraInputRef} 
@@ -976,6 +1051,13 @@ export default function PersonalAICanvas() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {serverWarming && (
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-[11px] animate-pulse">
+                <Activity className="w-3.5 h-3.5" />
+                <span>Waking cloud instance...</span>
+              </div>
+            )}
+
             <button
               onClick={() => setReportModalOpen(true)}
               className="px-2.5 py-1.5 rounded-full bg-white/80 hover:bg-white text-slate-700 shadow-sm border border-white/60 text-xs font-medium flex items-center gap-1 transition-all"
@@ -1060,7 +1142,7 @@ export default function PersonalAICanvas() {
                 <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto px-4">
                   {mode === "professional"
                     ? `Workspace tailored for ${profile.profession || "professionals"}. Ask for code reviews, domain advice, or upload documents.`
-                    : `Study workspace tailored for ${profile.grade_class || "students"}. Upload book notes to extract printable sheets or generate practice tests.`}
+                    : `Study workspace tailored for ${profile.grade_class || "students"}. Upload book notes or syllabus PDFs to extract printable sheets or quizzes.`}
                 </p>
               </div>
             </div>
@@ -1081,18 +1163,31 @@ export default function PersonalAICanvas() {
                 {msg.sender === "user" ? (
                   <div className="max-w-[85%] sm:max-w-[78%] px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl rounded-br-none bg-[#0284c7] text-white text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-wrap space-y-2">
                     {msg.image && (
-                      <img 
-                        src={msg.image} 
-                        alt="Uploaded document" 
-                        className="rounded-lg max-h-48 object-cover border border-white/30" 
-                      />
+                      <div className="rounded-lg overflow-hidden border border-white/30 bg-sky-800/50 p-1">
+                        {msg.image.startsWith("data:application/pdf") ? (
+                          <div className="flex items-center gap-2 p-2 text-xs">
+                            <FileText className="w-5 h-5 text-white" />
+                            <span>PDF Document Attached</span>
+                          </div>
+                        ) : (
+                          <img 
+                            src={msg.image} 
+                            alt="Uploaded preview" 
+                            className="max-h-48 rounded object-cover" 
+                          />
+                        )}
+                      </div>
                     )}
                     <div>{msg.text}</div>
                   </div>
                 ) : (
                   <div className="relative group max-w-[90%] sm:max-w-[85%] bg-white/95 text-slate-800 border border-white/60 rounded-2xl rounded-bl-none p-3.5 sm:p-5 shadow-sm">
-                    <div className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed pr-12 sm:pr-16">
-                      {msg.text || (loading ? "..." : "")}
+                    <div className="pr-12 sm:pr-16">
+                      {msg.text ? (
+                        <RichTextContent content={msg.text} />
+                      ) : (
+                        loading && <span className="italic text-slate-400">...</span>
+                      )}
                     </div>
                     
                     {msg.text && (
@@ -1156,10 +1251,9 @@ export default function PersonalAICanvas() {
             )}
           </div>
 
-          {/* Plus Menu Popup */}
+          {/* Plus Drawer */}
           {menuOpen && (
             <div className="absolute bottom-20 left-2 sm:left-4 z-50 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-2 w-64 space-y-1 animate-fadeIn">
-              {/* Screen / Window Capture */}
               <button
                 type="button"
                 onClick={handleCaptureScreen}
@@ -1169,7 +1263,6 @@ export default function PersonalAICanvas() {
                 Capture Screen / Window
               </button>
 
-              {/* Direct Camera Snapshot */}
               <button
                 type="button"
                 onClick={() => {
@@ -1182,17 +1275,15 @@ export default function PersonalAICanvas() {
                 Snap Photo / Video Clip
               </button>
 
-              {/* Document / File Upload */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors"
               >
                 <Paperclip className="w-4 h-4 text-sky-600" />
-                Upload files / Docs
+                Upload PDF / Syllabus / File
               </button>
 
-              {/* OCR Image Scan */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -1225,7 +1316,7 @@ export default function PersonalAICanvas() {
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder={
                 selectedFile 
-                  ? "Describe what to extract or format..."
+                  ? "Describe what to extract or analyze from this file..."
                   : mode === "professional"
                   ? `Ask for code reviews, advice for ${profile.profession}...`
                   : `Ask for study guides, quizzes for ${profile.grade_class || "your subjects"}...`

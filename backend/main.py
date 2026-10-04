@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import urllib.request
+import urllib.parse
 from typing import Optional, List, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +32,7 @@ app.add_middleware(
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 WHATSAPP_INVITE_TOKEN = os.getenv("WHATSAPP_INVITE_TOKEN", "FAMILY_CIRCLE_2026")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
@@ -53,6 +56,7 @@ class ChatRequest(BaseModel):
     profile: Optional[dict] = None
     role_mode: Optional[str] = "professional"
     message: str
+    history: Optional[List[dict]] = None
     image_base64: Optional[str] = None
     image_mime_type: Optional[str] = "image/jpeg"
     invite_token: Optional[str] = None
@@ -60,11 +64,12 @@ class ChatRequest(BaseModel):
 
 
 @app.get("/")
-async def root():
+@app.get("/health")
+async def health():
     return {
         "status": "online",
         "service": "Personal AI Canvas Backend",
-        "mode": "hybrid-desktop-mobile",
+        "version": "5-phase-integrated",
     }
 
 
@@ -87,30 +92,33 @@ async def report_issue(payload: ReportIssueRequest):
     if not payload.description.strip():
         raise HTTPException(status_code=400, detail="Description is required")
 
-    logger.info(
+    log_msg = (
         f"[IN-APP ISSUE REPORT] User: {payload.user_name} | Mode: {payload.role_mode} | "
         f"Category: {payload.category} | Device: {payload.device_id} | Details: {payload.description}"
     )
+    logger.info(log_msg)
 
-    phone = os.getenv("ADMIN_PHONE")
-    apikey = os.getenv("CALLMEBOT_API_KEY")
-    if phone and apikey:
+    # Instant Webhook Alert: Discord or Telegram
+    webhook_url = DISCORD_WEBHOOK_URL or os.getenv("WEBHOOK_URL")
+    if webhook_url:
         try:
-            import urllib.parse
-            import urllib.request
-
-            msg = (
-                f"*AI Canvas Feedback*\n"
-                f"From: {payload.user_name} ({payload.category})\n"
-                f"Issue: {payload.description}\n"
-                f"Device: {payload.device_id}"
+            req_data = json.dumps({
+                "content": (
+                    f"🚨 **New Feedback Submitted**\n"
+                    f"• **User:** {payload.user_name} ({payload.role_mode})\n"
+                    f"• **Category:** {payload.category}\n"
+                    f"• **Details:** {payload.description}\n"
+                    f"• **Device:** `{payload.device_id}`"
+                )
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                webhook_url,
+                data=req_data,
+                headers={"Content-Type": "application/json", "User-Agent": "FastAPI"},
             )
-            encoded = urllib.parse.quote_plus(msg)
-            url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded}&apikey={apikey}"
-            req = urllib.request.Request(url, headers={"User-Agent": "FastAPI"})
-            urllib.request.urlopen(req, timeout=5)
+            urllib.request.urlopen(req, timeout=4)
         except Exception as e:
-            logger.warning(f"Could not forward alert to WhatsApp bot: {e}")
+            logger.warning(f"Could not forward alert to webhook: {e}")
 
     return {"status": "success", "message": "Feedback received by admin"}
 
@@ -133,32 +141,41 @@ async def chat(request: ChatRequest):
                 f"You are an expert executive AI assistant and copilot for {user_name}, "
                 f"who works as a {profession}. Their primary interests include {interests}. "
                 "Provide thorough, high-precision technical answers, code solutions, workflow analysis, "
-                "and executive-level written communications."
+                "and executive-level written communications. For code blocks, always declare the language."
             )
         else:
             sys_prompt = (
                 f"You are an academic coach and study architect for {user_name}, "
                 f"currently studying {grade_class}. Their primary interests include {interests}. "
                 "Break down complex academic concepts step-by-step, generate quizzes, explain principles "
-                "simply, and prepare printable structured summaries."
+                "simply, and prepare printable structured summaries. Use bolding and clear lists."
             )
 
         contents: List[Any] = [sys_prompt]
 
+        # Multi-turn memory: load the last 6 turns
+        if request.history:
+            recent_turns = request.history[-6:]
+            for turn in recent_turns:
+                sender_label = "User" if turn.get("sender") == "user" else "Assistant"
+                turn_text = turn.get("text", "")
+                if turn_text:
+                    contents.append(f"{sender_label}: {turn_text}")
+
+        # Native Image & Multi-page PDF extraction
         if request.image_base64:
             import base64
-
-            image_bytes = base64.b64decode(request.image_base64)
+            doc_bytes = base64.b64decode(request.image_base64)
+            mime = request.image_mime_type or "image/jpeg"
             contents.append(
                 types.Part.from_bytes(
-                    data=image_bytes,
-                    mime_type=request.image_mime_type or "image/jpeg",
+                    data=doc_bytes,
+                    mime_type=mime,
                 )
             )
 
-        contents.append(request.message)
+        contents.append(f"User: {request.message}")
 
-        # Explicitly configure generation to eliminate the AFC notice
         gen_config = types.GenerateContentConfig(
             temperature=0.7,
         )
