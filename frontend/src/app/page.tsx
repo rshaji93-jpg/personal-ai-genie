@@ -64,6 +64,13 @@ interface UserProfile {
   onboarded: boolean;
 }
 
+interface SuggestionChip {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  action?: () => void;
+  text?: string;
+}
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 function RichTextContent({ content, onExpand }: { content: string; onExpand: () => void }) {
@@ -806,6 +813,21 @@ export default function PersonalAICanvas() {
     setAuthenticated(false);
   };
 
+  // Explicit strongly-typed chips to eliminate TS2339 union errors
+  const professionalChips: SuggestionChip[] = [
+    { label: "Scan target job openings", icon: Briefcase, action: handleJobScanWorkflow },
+    { label: "Review & debug code block", icon: Code, text: "Review and debug this code block: " },
+    { label: "Analyze RCM / operational workflow", icon: Search, text: "Analyze this RCM operations workflow for denials and audit risks: " },
+    { label: "Draft professional follow-up", icon: FileText, text: "Draft an executive follow-up email regarding: " },
+  ];
+
+  const studentChips: SuggestionChip[] = [
+    { label: "Create 5-question practice quiz", icon: HelpCircle, text: "Generate a 5-question practice quiz testing: " },
+    { label: "Explain a complex topic simply", icon: BookOpen, text: "Explain this topic simply with real-world analogies: " },
+    { label: "Build a 7-day study timetable", icon: GraduationCap, text: "Build a balanced 7-day study timetable for: " },
+    { label: "Generate concept flashcards", icon: Sparkles, text: "Generate printable concept flashcards for: " },
+  ];
+
   // Secure Gatekeeper Screen (Discreet inputs, no leaked examples)
   if (!authenticated) {
     return (
@@ -868,20 +890,6 @@ export default function PersonalAICanvas() {
       </div>
     );
   }
-
-  const professionalChips = [
-    { label: "Scan target job openings", icon: Briefcase, action: handleJobScanWorkflow },
-    { label: "Review & debug code block", icon: Code, text: "Review and debug this code block: " },
-    { label: "Analyze RCM / operational workflow", icon: Search, text: "Analyze this RCM operations workflow for denials and audit risks: " },
-    { label: "Draft professional follow-up", icon: FileText, text: "Draft an executive follow-up email regarding: " },
-  ];
-
-  const studentChips = [
-    { label: "Create 5-question practice quiz", icon: HelpCircle, text: "Generate a 5-question practice quiz testing: " },
-    { label: "Explain a complex topic simply", icon: BookOpen, text: "Explain this topic simply with real-world analogies: " },
-    { label: "Build a 7-day study timetable", icon: GraduationCap, text: "Build a balanced 7-day study timetable for: " },
-    { label: "Generate concept flashcards", icon: Sparkles, text: "Generate printable concept flashcards for: " },
-  ];
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-gradient-to-b from-[#7ec5f9] via-[#bce3f9] to-[#f4f7d8]">
@@ -1124,7 +1132,7 @@ export default function PersonalAICanvas() {
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col justify-between p-2.5 sm:p-6 transition-all duration-300 w-full overflow-hidden">
-        {/* Pinned Top Bar with New Chat & End Chat Controls */}
+        {/* Pinned Top Bar with Direct New Chat & End Chat Controls */}
         <header className="flex justify-between items-center max-w-5xl w-full mx-auto gap-2">
           <div className="flex items-center gap-1.5">
             <button
@@ -1313,7 +1321,13 @@ export default function PersonalAICanvas() {
               return (
                 <button
                   key={idx}
-                  onClick={() => chip.action ? chip.action() : handleSend(chip.text)}
+                  onClick={() => {
+                    if (chip.action) {
+                      chip.action();
+                    } else if (chip.text) {
+                      handleSend(chip.text);
+                    }
+                  }}
                   className="whitespace-nowrap flex-shrink-0 bg-white/85 hover:bg-white text-slate-800 text-xs font-semibold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-xs border border-white/60"
                 >
                   <Icon className="w-3.5 h-3.5 text-sky-600" />
