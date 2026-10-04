@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import asyncio
+import base64
 import urllib.request
 import urllib.parse
 from typing import Optional, List, Any
@@ -31,10 +33,21 @@ app.add_middleware(
 )
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-WHATSAPP_INVITE_TOKEN = os.getenv("WHATSAPP_INVITE_TOKEN", "FAMILY_CIRCLE_2026")
+UNIVERSAL_PASSCODE = os.getenv("CANVAS_PASSCODE", "shaji family").strip().lower()
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
+# Explicit individual email allowlist & domain-wide Workspace allowlist
+ALLOWED_EMAILS = [e.strip().lower() for e in os.getenv("ALLOWED_EMAILS", "").split(",") if e.strip()]
+ALLOWED_WORKSPACE_DOMAINS = [d.strip().lower() for d in os.getenv("ALLOWED_WORKSPACE_DOMAINS", "").split(",") if d.strip()]
+
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+# Preserved stable model fallback chain
+STABLE_MODELS = [
+    "models/gemini-3.8-flash",
+    "models/gemini-3.7-flash",
+    "models/gemini-3.6-flash",
+]
 
 
 class TokenVerifyRequest(BaseModel):
@@ -42,6 +55,12 @@ class TokenVerifyRequest(BaseModel):
     passcode: Optional[str] = None
     invite_token: Optional[str] = None
     device_id: Optional[str] = None
+    google_email: Optional[str] = None
+
+
+class AudioTranslateRequest(BaseModel):
+    audio_base64: str
+    mime_type: Optional[str] = "audio/webm"
 
 
 class ReportIssueRequest(BaseModel):
@@ -52,14 +71,21 @@ class ReportIssueRequest(BaseModel):
     description: str
 
 
+class JobScanRequest(BaseModel):
+    query: str
+    location: Optional[str] = "Chennai"
+
+
 class ChatRequest(BaseModel):
     profile: Optional[dict] = None
     role_mode: Optional[str] = "professional"
+    conversational_style: Optional[str] = "chat"
     message: str
     history: Optional[List[dict]] = None
     image_base64: Optional[str] = None
     image_mime_type: Optional[str] = "image/jpeg"
     invite_token: Optional[str] = None
+    google_email: Optional[str] = None
     device_id: Optional[str] = None
 
 
@@ -69,21 +95,118 @@ async def health():
     return {
         "status": "online",
         "service": "Personal AI Canvas Backend",
-        "version": "5-phase-integrated",
+        "version": "6-phase-multilingual",
     }
 
 
 @app.post("/api/verify-token")
 @app.post("/verify-token")
 async def verify_token(payload: TokenVerifyRequest):
-    provided = payload.invite_token or payload.token or payload.passcode
-    if not provided:
-        raise HTTPException(status_code=400, detail="Token or passcode is required")
+    # 1. Google Account / Google Workspace Validation
+    if payload.google_email:
+        clean_email = payload.google_email.strip().lower()
+        domain = clean_email.split("@")[-1] if "@" in clean_email else ""
 
-    if provided.strip() == WHATSAPP_INVITE_TOKEN.strip():
-        return {"valid": True, "message": "Access granted"}
+        is_allowed_email = not ALLOWED_EMAILS or clean_email in ALLOWED_EMAILS
+        is_allowed_workspace = domain in ALLOWED_WORKSPACE_DOMAINS
 
-    raise HTTPException(status_code=401, detail="Invalid passcode or limit reached")
+        if is_allowed_email or is_allowed_workspace:
+            account_type = "workspace" if domain not in ["gmail.com", "googlemail.com"] else "personal"
+            return {
+                "valid": True,
+                "auth_type": "google",
+                "account_type": account_type,
+                "email": clean_email,
+            }
+
+        raise HTTPException(
+            status_code=403,
+            detail=f"Account '{clean_email}' is not authorized. Contact your workspace admin.",
+        )
+
+    # 2. Universal Passcode Validation (Zero leak)
+    provided = payload.passcode or payload.invite_token or payload.token
+    if provided and provided.strip().lower() == UNIVERSAL_PASSCODE:
+        return {"valid": True, "auth_type": "passcode"}
+
+    raise HTTPException(status_code=401, detail="Invalid passcode.")
+
+
+@app.post("/api/translate-speech")
+async def translate_speech(payload: AudioTranslateRequest):
+    """
+    Multilingual speech translator: accepts spoken audio in ANY language
+    (Tamil, Telugu, Malayalam, Hindi, English, etc.) from ANY speaker in the room
+    and translates it directly into clear English text.
+    """
+    if not client:
+        raise HTTPException(status_code=500, detail="Gemini client not initialized")
+
+    try:
+        audio_bytes = base64.b64decode(payload.audio_base64)
+        prompt = (
+            "Listen carefully to this audio. The speaker can be anyone speaking in their native language—"
+            "such as Tamil, Telugu, Malayalam, Hindi, or English. "
+            "Translate their exact meaning directly into natural, clear English text. "
+            "Return ONLY the English translation without preamble, conversational remarks, or quotation marks."
+        )
+
+        for model_name in STABLE_MODELS:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[
+                        prompt,
+                        types.Part.from_bytes(
+                            data=audio_bytes,
+                            mime_type=payload.mime_type or "audio/webm",
+                        ),
+                    ],
+                )
+                translated_text = response.text.strip() if response.text else ""
+                return {"text": translated_text}
+            except Exception as e:
+                logger.warning(f"Translation attempt on {model_name} failed: {e}")
+                continue
+
+        raise HTTPException(status_code=500, detail="Audio translation models currently unavailable")
+    except Exception as e:
+        logger.error(f"Audio translation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/scan-jobs")
+async def scan_jobs(payload: JobScanRequest):
+    try:
+        from playwright.async_api import async_playwright
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            search_term = urllib.parse.quote(f"{payload.query} {payload.location}")
+            await page.goto(f"https://html.duckduckgo.com/html/?q={search_term}+careers+jobs", timeout=12000)
+
+            results = []
+            links = await page.locator(".result__title .result__url").all_text_contents()
+            snippets = await page.locator(".result__snippet").all_text_contents()
+            await browser.close()
+
+            for i in range(min(5, len(links))):
+                results.append({
+                    "title": f"Target Position: {payload.query}",
+                    "portal": links[i].strip() if i < len(links) else "Career Portal",
+                    "snippet": snippets[i].strip() if i < len(snippets) else "Live opportunity",
+                })
+
+            return {"status": "success", "jobs": results}
+    except Exception as e:
+        logger.warning(f"Playwright scan fallback triggered: {e}")
+        return {
+            "status": "fallback",
+            "jobs": [
+                {"title": f"{payload.query} - Healthcare Operations", "portal": "Direct Healthcare Portal", "snippet": "Immediate openings for revenue cycle specialists."},
+                {"title": f"{payload.query} - Senior Process Executive", "portal": "IT Solutions Careers", "snippet": "Accounts receivable workflow and claims audit operations."}
+            ]
+        }
 
 
 @app.post("/api/report-issue")
@@ -92,24 +215,14 @@ async def report_issue(payload: ReportIssueRequest):
     if not payload.description.strip():
         raise HTTPException(status_code=400, detail="Description is required")
 
-    log_msg = (
-        f"[IN-APP ISSUE REPORT] User: {payload.user_name} | Mode: {payload.role_mode} | "
-        f"Category: {payload.category} | Device: {payload.device_id} | Details: {payload.description}"
-    )
+    log_msg = f"[IN-APP REPORT] User: {payload.user_name} | Mode: {payload.role_mode} | Details: {payload.description}"
     logger.info(log_msg)
 
-    # Instant Webhook Alert: Discord or Telegram
     webhook_url = DISCORD_WEBHOOK_URL or os.getenv("WEBHOOK_URL")
     if webhook_url:
         try:
             req_data = json.dumps({
-                "content": (
-                    f"🚨 **New Feedback Submitted**\n"
-                    f"• **User:** {payload.user_name} ({payload.role_mode})\n"
-                    f"• **Category:** {payload.category}\n"
-                    f"• **Details:** {payload.description}\n"
-                    f"• **Device:** `{payload.device_id}`"
-                )
+                "content": f"🚨 **Report from {payload.user_name}**: {payload.description}"
             }).encode("utf-8")
             req = urllib.request.Request(
                 webhook_url,
@@ -118,9 +231,9 @@ async def report_issue(payload: ReportIssueRequest):
             )
             urllib.request.urlopen(req, timeout=4)
         except Exception as e:
-            logger.warning(f"Could not forward alert to webhook: {e}")
+            logger.warning(f"Webhook forward failed: {e}")
 
-    return {"status": "success", "message": "Feedback received by admin"}
+    return {"status": "success", "message": "Feedback received"}
 
 
 @app.post("/api/chat")
@@ -136,24 +249,26 @@ async def chat(request: ChatRequest):
         grade_class = user_profile.get("grade_class", "Student")
         interests = user_profile.get("interests", "General Topics")
 
+        style_instruction = (
+            "Keep your response concise, punchy, and conversational (under 3 sentences) unless asked to elaborate. "
+            "If the user's intent is ambiguous or missing key details, ask a single direct clarifying question before continuing."
+            if request.conversational_style == "chat"
+            else "Provide an in-depth, structured document response with clear headings, bullet points, and actionable breakdowns."
+        )
+
         if request.role_mode == "professional":
             sys_prompt = (
-                f"You are an expert executive AI assistant and copilot for {user_name}, "
-                f"who works as a {profession}. Their primary interests include {interests}. "
-                "Provide thorough, high-precision technical answers, code solutions, workflow analysis, "
-                "and executive-level written communications. For code blocks, always declare the language."
+                f"You are an executive copilot for {user_name}, working in {profession}. "
+                f"Core focus: {interests}. {style_instruction}"
             )
         else:
             sys_prompt = (
-                f"You are an academic coach and study architect for {user_name}, "
-                f"currently studying {grade_class}. Their primary interests include {interests}. "
-                "Break down complex academic concepts step-by-step, generate quizzes, explain principles "
-                "simply, and prepare printable structured summaries. Use bolding and clear lists."
+                f"You are an academic coach and study architect for {user_name}, studying {grade_class}. "
+                f"Core focus: {interests}. {style_instruction}"
             )
 
         contents: List[Any] = [sys_prompt]
 
-        # Multi-turn memory: load the last 6 turns
         if request.history:
             recent_turns = request.history[-6:]
             for turn in recent_turns:
@@ -162,9 +277,7 @@ async def chat(request: ChatRequest):
                 if turn_text:
                     contents.append(f"{sender_label}: {turn_text}")
 
-        # Native Image & Multi-page PDF extraction
         if request.image_base64:
-            import base64
             doc_bytes = base64.b64decode(request.image_base64)
             mime = request.image_mime_type or "image/jpeg"
             contents.append(
@@ -175,18 +288,9 @@ async def chat(request: ChatRequest):
             )
 
         contents.append(f"User: {request.message}")
+        gen_config = types.GenerateContentConfig(temperature=0.7)
 
-        gen_config = types.GenerateContentConfig(
-            temperature=0.7,
-        )
-
-        models_to_try = [
-            "gemini-3.8-flash",
-            "gemini-3.5-flash",
-            "gemini-3.1-pro-preview",
-        ]
-
-        for model_name in models_to_try:
+        for model_name in STABLE_MODELS:
             try:
                 response = client.models.generate_content_stream(
                     model=model_name,
@@ -199,12 +303,12 @@ async def chat(request: ChatRequest):
                 return
             except Exception as model_err:
                 err_text = str(model_err)
-                if any(code in err_text for code in ["503", "UNAVAILABLE", "404", "NOT_FOUND"]):
+                if any(code in err_text for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
                     continue
                 else:
                     yield f"\n[AI Error: {err_text}]"
                     return
 
-        yield "\n[AI Error: High demand across all endpoints. Please retry shortly.]"
+        yield "\n[RATE_LIMIT_COOLDOWN: Engine busy. Cooling down for a few seconds before auto-retrying...]"
 
     return StreamingResponse(generate_stream(), media_type="text/plain")
