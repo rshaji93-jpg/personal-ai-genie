@@ -31,7 +31,9 @@ import {
   BookmarkCheck,
   Lock,
   MessageCircleQuestion,
-  SendHorizontal
+  SendHorizontal,
+  Camera,
+  Monitor
 } from "lucide-react";
 
 interface Message {
@@ -111,6 +113,7 @@ export default function PersonalAICanvas() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const currentMessages = mode === "professional" ? profMessages : studentMessages;
 
@@ -353,6 +356,47 @@ export default function PersonalAICanvas() {
       setMenuOpen(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  // Instant Desktop Screen / Window Snapshot
+  const handleCaptureScreen = async () => {
+    setMenuOpen(false);
+    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: "browser" } as any,
+        });
+
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        await video.play();
+
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        stream.getVideoTracks().forEach((track) => track.stop());
+
+        const base64Data = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
+        setSelectedFile({
+          base64: base64Data,
+          mimeType: "image/jpeg",
+          name: `Screen_Capture_${Date.now()}.jpg`,
+        });
+
+        if (!inputValue.trim()) {
+          setInputValue("Please examine this screen capture and explain what is shown.");
+        }
+      } catch (err: any) {
+        if (err.name !== "NotAllowedError") {
+          console.error("Screen capture error:", err);
+        }
+      }
+    } else {
+      cameraInputRef.current?.click();
+    }
   };
 
   const selectSession = (session: ChatSession) => {
@@ -633,11 +677,22 @@ export default function PersonalAICanvas() {
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-gradient-to-b from-[#7ec5f9] via-[#bce3f9] to-[#f4f7d8]">
+      {/* File Upload Hidden Input */}
       <input 
         type="file" 
         ref={fileInputRef} 
         onChange={handleFileUpload} 
         accept="image/*,application/pdf" 
+        className="hidden" 
+      />
+
+      {/* Direct Mobile Camera / Video Capture Input */}
+      <input 
+        type="file" 
+        ref={cameraInputRef} 
+        onChange={handleFileUpload} 
+        accept="image/*,video/*" 
+        capture="environment" 
         className="hidden" 
       />
 
@@ -1101,9 +1156,35 @@ export default function PersonalAICanvas() {
             )}
           </div>
 
+          {/* Plus Menu Popup */}
           {menuOpen && (
-            <div className="absolute bottom-20 left-2 sm:left-4 z-50 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-2 w-52 sm:w-56 space-y-1 animate-fadeIn">
+            <div className="absolute bottom-20 left-2 sm:left-4 z-50 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-2 w-64 space-y-1 animate-fadeIn">
+              {/* Screen / Window Capture */}
               <button
+                type="button"
+                onClick={handleCaptureScreen}
+                className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors"
+              >
+                <Monitor className="w-4 h-4 text-indigo-600" />
+                Capture Screen / Window
+              </button>
+
+              {/* Direct Camera Snapshot */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  cameraInputRef.current?.click();
+                }}
+                className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors"
+              >
+                <Camera className="w-4 h-4 text-amber-600" />
+                Snap Photo / Video Clip
+              </button>
+
+              {/* Document / File Upload */}
+              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors"
               >
@@ -1111,7 +1192,9 @@ export default function PersonalAICanvas() {
                 Upload files / Docs
               </button>
 
+              {/* OCR Image Scan */}
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors"
               >
