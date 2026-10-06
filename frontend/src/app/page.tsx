@@ -80,7 +80,6 @@ export default function Home() {
   const [isDockHidden, setIsDockHidden] = useState(false);
   const [isTeamMode, setIsTeamMode] = useState(false);
 
-  // Group Governance (50 members cap)
   const [members, setMembers] = useState<RoomMember[]>([
     { id: "1", name: "Shaji Joseph (You)", role: "admin", status: "active" },
     { id: "2", name: "Ananya", role: "member", status: "active" },
@@ -90,19 +89,16 @@ export default function Home() {
   const [activeSpeaker, setActiveSpeaker] = useState<string>("Shaji Joseph (You)");
   const [roomAdminOpen, setRoomAdminOpen] = useState(false);
 
-  // Sessions
   const [sessions, setSessions] = useState<ChatSession[]>([
     { id: "1", title: "New Session", isPinned: false, messages: [] },
   ]);
   const [currentSessionId, setCurrentSessionId] = useState("1");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-  // Quoted Reply & Forwarding State
   const [replyTarget, setReplyTarget] = useState<{ author: string; content: string } | null>(null);
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
-  // User Profile
   const [userProfile, setUserProfile] = useState({
     name: "Shaji Joseph",
     email: "shaji@gmail.com",
@@ -114,17 +110,14 @@ export default function Home() {
     customApiKey: "",
   });
 
-  // Inline Editing
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
 
-  // Modals
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [prohibitionNotice, setProhibitionNotice] = useState<string | null>(null);
 
-  // Inputs & Speech
   const [prompt, setPrompt] = useState("");
   const [selectedLang, setSelectedLang] = useState(INDIAN_LANGUAGES[0]);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -138,7 +131,6 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic API Base URL for Cloud Deployment
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const currentSession = sessions.find((s) => s.id === currentSessionId) || sessions[0];
@@ -148,7 +140,6 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  // Audio Equalizer Visualizer
   useEffect(() => {
     if (isListening) {
       const updateWaves = () => {
@@ -171,7 +162,6 @@ export default function Home() {
     };
   }, [isListening]);
 
-  // Dictation Engine
   const toggleListening = () => {
     if (isListening) {
       if (recognitionRef.current) recognitionRef.current.stop();
@@ -210,20 +200,17 @@ export default function Home() {
     }
   };
 
-  // Submit Prompt Handler
   const handleSendMessage = async (e?: React.FormEvent, customText?: string) => {
     if (e) e.preventDefault();
     const textToSend = customText !== undefined ? customText : prompt;
     if (!textToSend.trim() || isStreaming) return;
 
-    // Check Member Active Status
     const currentMemberObj = members.find((m) => m.name === activeSpeaker);
     if (isTeamMode && currentMemberObj?.status === "inactive") {
-      alert("Your account is currently inactive in this sponsored room. Contact the room admin.");
+      alert("Your account is currently inactive in this room.");
       return;
     }
 
-    // Prohibition Filter
     const lower = textToSend.toLowerCase();
     const isProhibited = [
       "create photo",
@@ -236,7 +223,7 @@ export default function Home() {
 
     if (isProhibited) {
       setProhibitionNotice(
-        "Genie is specialized for study and business analysis. Generative image creation and video editing are strictly prohibited."
+        "Genie is specialized for study and business analysis. Generative image and video synthesis are prohibited."
       );
       setTimeout(() => setProhibitionNotice(null), 5000);
       return;
@@ -271,7 +258,6 @@ export default function Home() {
       })
     );
 
-    // Multilingual Summon Check
     const hasGenieCall = [
       "@genie",
       "genie",
@@ -347,7 +333,6 @@ export default function Home() {
     }
   };
 
-  // Inline Prompt Editing
   const handleUpdatePrompt = async (index: number) => {
     if (!editText.trim()) return;
 
@@ -420,7 +405,6 @@ export default function Home() {
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-[#F0F2F6] text-slate-800 antialiased font-sans">
-      {/* 1. SIDEBAR */}
       <aside
         className={`${
           sidebarOpen ? "w-72" : "w-0 -translate-x-full lg:w-0"
@@ -480,7 +464,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* History Feed */}
         <div className="flex-1 overflow-y-auto px-3 space-y-1">
           <div className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
             History
@@ -581,7 +564,6 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Bottom Bar */}
         <div className="p-3 border-t border-[#D9DFEA] bg-[#E1E5EE]/60 space-y-2">
           <div className="flex items-center justify-between bg-white/70 p-2 rounded-xl border border-slate-200">
             <div className="flex items-center gap-2">
@@ -633,9 +615,7 @@ export default function Home() {
         </button>
       )}
 
-      {/* 2. MAIN CANVAS */}
       <main className="flex flex-1 flex-col h-full min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
-        {/* Header */}
         <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-[#DDE3EE] bg-white/70 backdrop-blur-md z-10 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex items-center p-1 bg-white rounded-full border-2 border-purple-600 shadow-sm">
@@ -664,7 +644,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Team Mode & Admin Roster */}
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setIsTeamMode(!isTeamMode)}
@@ -703,7 +682,6 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Scrollable Center Feed */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
           {prohibitionNotice && (
             <div className="max-w-2xl mx-auto mb-4 p-3 bg-amber-50 border border-amber-300 text-amber-800 rounded-2xl text-xs font-medium flex items-center gap-2 shadow-sm">
@@ -747,7 +725,6 @@ export default function Home() {
                     </span>
                   )}
 
-                  {/* USER BUBBLE */}
                   {msg.role === "user" ? (
                     editingMessageIndex === index ? (
                       <div className="w-full max-w-xl self-end space-y-2">
@@ -774,7 +751,6 @@ export default function Home() {
                       </div>
                     ) : (
                       <div className="group relative flex items-center gap-2">
-                        {/* Action buttons */}
                         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                           <button
                             onClick={() =>
@@ -821,7 +797,6 @@ export default function Home() {
                       </div>
                     )
                   ) : (
-                    /* ASSISTANT BUBBLE */
                     <div className="space-y-1.5 max-w-[85%]">
                       <div className="bg-white text-slate-800 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed border border-slate-200 shadow-sm">
                         <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -876,7 +851,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Floating Input Dock Toggle */}
         {isDockHidden && (
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30">
             <button
@@ -889,10 +863,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* DOCKED CHAT BAR */}
         {!isDockHidden && (
           <div className="flex-shrink-0 w-full px-4 py-3 bg-white/80 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300">
-            {/* Quoted Reply Docked Banner */}
             {replyTarget && (
               <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded-xl text-xs">
                 <div className="truncate">
@@ -908,7 +880,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Speaking Persona Switcher in Team Mode */}
             {isTeamMode && (
               <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between px-3 py-1.5 bg-purple-50/80 border border-purple-200 rounded-xl text-[11px]">
                 <div className="flex items-center gap-2">
@@ -940,7 +911,6 @@ export default function Home() {
             )}
 
             <div className="w-full max-w-3xl mx-auto relative">
-              {/* Native Emoji Tray */}
               {emojiPickerOpen && (
                 <div className="absolute left-10 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 flex items-center gap-2">
                   {QUICK_EMOJIS.map((emoji) => (
@@ -1033,7 +1003,7 @@ export default function Home() {
                               selectedLang.code === lang.code
                                 ? "text-purple-700 font-semibold bg-purple-50/50"
                                 : "text-slate-700"
-                            }`}
+                            Buyers}`}
                           >
                             <span>{lang.label}</span>
                             <span className="text-[10px] text-slate-400">{lang.code.split("-")[0]}</span>
@@ -1095,7 +1065,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* 3. ROOM ADMIN & GOVERNANCE MODAL */}
       {roomAdminOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
@@ -1188,7 +1157,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 4. FORWARD MESSAGE MODAL */}
       {forwardMessage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 space-y-4">
@@ -1238,7 +1206,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 5. TWO-TAB SETTINGS MODAL */}
       {settingsOpen && (
         <SettingsModalComponent
           isOpen={settingsOpen}
@@ -1248,7 +1215,6 @@ export default function Home() {
         />
       )}
 
-      {/* 6. SYNC / BACKUP MODAL */}
       {syncModalOpen && (
         <SyncModalComponent
           isOpen={syncModalOpen}
@@ -1275,7 +1241,6 @@ export default function Home() {
         />
       )}
 
-      {/* 7. SHARE MODAL */}
       {shareModalOpen && (
         <ShareModalComponent
           isOpen={shareModalOpen}
@@ -1286,10 +1251,6 @@ export default function Home() {
     </div>
   );
 }
-
-// ==========================================
-// PREFERENCES & DEVELOPER HUB (TWO-TAB)
-// ==========================================
 
 function SettingsModalComponent({
   isOpen,
