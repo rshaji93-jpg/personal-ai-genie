@@ -41,7 +41,12 @@ import {
   UserX,
 } from "lucide-react";
 
-const INDIAN_LANGUAGES = [
+interface IndianLanguage {
+  code: string;
+  label: string;
+}
+
+const INDIAN_LANGUAGES: IndianLanguage[] = [
   { code: "en-IN", label: "EN (India)" },
   { code: "ta-IN", label: "தமிழ்" },
   { code: "hi-IN", label: "हिन्दी" },
@@ -51,7 +56,7 @@ const INDIAN_LANGUAGES = [
   { code: "bn-IN", label: "বাংলা" },
 ];
 
-const QUICK_EMOJIS = ["👍", "❤️", "😊", "🔥", "🙏", "🎉", "💡", "📚", "🎯", "👏", "✨", "🚀"];
+const QUICK_EMOJIS: string[] = ["👍", "❤️", "😊", "🔥", "🙏", "🎉", "💡", "📚", "🎯", "👏", "✨", "🚀"];
 
 interface RoomMember {
   id: string;
@@ -72,6 +77,17 @@ interface ChatSession {
   title: string;
   isPinned: boolean;
   messages: Message[];
+}
+
+interface UserProfile {
+  name: string;
+  email: string;
+  avatarUrl: string;
+  role: "student" | "professional";
+  profession: string;
+  ageGroup: string;
+  gender: string;
+  customApiKey: string;
 }
 
 export default function Home() {
@@ -99,11 +115,11 @@ export default function Home() {
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
-  const [userProfile, setUserProfile] = useState({
+  const [userProfile, setUserProfile] = useState<UserProfile>({
     name: "Shaji Joseph",
     email: "shaji@gmail.com",
     avatarUrl: "/avatar.svg",
-    role: "professional" as "student" | "professional",
+    role: "professional",
     profession: "Healthcare Revenue Cycle & Client Operations",
     ageGroup: "pro",
     gender: "male",
@@ -119,19 +135,19 @@ export default function Home() {
   const [prohibitionNotice, setProhibitionNotice] = useState<string | null>(null);
 
   const [prompt, setPrompt] = useState("");
-  const [selectedLang, setSelectedLang] = useState(INDIAN_LANGUAGES[0]);
+  const [selectedLang, setSelectedLang] = useState<IndianLanguage>(INDIAN_LANGUAGES[0]);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [audioVolume, setAudioVolume] = useState<number[]>([12, 18, 10, 24, 14]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<unknown>(null);
   const animationFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://personal-ai-genie-backend.onrender.com";
 
   const currentSession = sessions.find((s) => s.id === currentSessionId) || sessions[0];
   const messages = currentSession.messages;
@@ -164,13 +180,16 @@ export default function Home() {
 
   const toggleListening = () => {
     if (isListening) {
-      if (recognitionRef.current) recognitionRef.current.stop();
+      if (recognitionRef.current) {
+        (recognitionRef.current as { stop: () => void }).stop();
+      }
       setIsListening(false);
       return;
     }
 
     const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition ||
+      (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       alert("Speech dictation works in Google Chrome, Microsoft Edge, and Safari.");
@@ -235,7 +254,7 @@ export default function Home() {
     setEmojiPickerOpen(false);
 
     if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
+      (recognitionRef.current as { stop: () => void }).stop();
       setIsListening(false);
     }
 
@@ -1003,7 +1022,7 @@ export default function Home() {
                               selectedLang.code === lang.code
                                 ? "text-purple-700 font-semibold bg-purple-50/50"
                                 : "text-slate-700"
-                            Buyers}`}
+                            }`}
                           >
                             <span>{lang.label}</span>
                             <span className="text-[10px] text-slate-400">{lang.code.split("-")[0]}</span>
@@ -1167,7 +1186,7 @@ export default function Home() {
               </button>
             </div>
             <div className="p-3 bg-purple-50 rounded-xl text-xs text-purple-900 italic max-h-20 overflow-hidden text-ellipsis">
-              "{forwardMessage.content}"
+              &quot;{forwardMessage.content}&quot;
             </div>
             <div className="space-y-1">
               <span className="text-[11px] font-bold text-slate-600">Select Destination Session:</span>
@@ -1260,8 +1279,8 @@ function SettingsModalComponent({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  userProfile: any;
-  onSaveProfile: (profile: any) => void;
+  userProfile: UserProfile;
+  onSaveProfile: (profile: UserProfile) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"profile" | "developer">("profile");
 
@@ -1295,7 +1314,7 @@ function SettingsModalComponent({
     if (!ticketDescription.trim()) return;
 
     try {
-      const res = await fetch("http://localhost:8000/api/tickets", {
+      const res = await fetch("https://personal-ai-genie-backend.onrender.com/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1575,7 +1594,15 @@ function SettingsModalComponent({
   );
 }
 
-function SyncModalComponent({ isOpen, onClose, onImportCode }: any) {
+function SyncModalComponent({
+  isOpen,
+  onClose,
+  onImportCode,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onImportCode: (code: string) => void;
+}) {
   const [syncCode, setSyncCode] = useState("");
   if (!isOpen) return null;
 
@@ -1611,7 +1638,15 @@ function SyncModalComponent({ isOpen, onClose, onImportCode }: any) {
   );
 }
 
-function ShareModalComponent({ isOpen, onClose, chatTitle }: any) {
+function ShareModalComponent({
+  isOpen,
+  onClose,
+  chatTitle,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  chatTitle: string;
+}) {
   const [copied, setCopied] = useState(false);
   if (!isOpen) return null;
   const shareCode = `GENIE-SHARE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
