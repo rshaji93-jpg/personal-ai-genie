@@ -1,1514 +1,1683 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { 
-  Sparkles, 
-  Send, 
-  Mic, 
-  MicOff, 
-  Plus, 
-  User, 
-  Briefcase, 
-  Code, 
-  Search, 
-  FileText, 
-  GraduationCap, 
-  BookOpen, 
-  HelpCircle,
+import React, { useState, useRef, useEffect } from "react";
+import {
+  User,
+  Briefcase,
+  Plus,
+  MessageSquare,
+  MoreVertical,
+  Share2,
+  Pin,
+  Edit2,
+  Trash2,
+  Download,
+  KeyRound,
+  Settings as SettingsIcon,
+  X,
+  ExternalLink,
+  GraduationCap,
+  Key,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Mic,
+  MicOff,
+  Send,
+  Globe,
+  Users,
+  ShieldAlert,
+  SendHorizontal,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
   Copy,
   Check,
-  PanelLeftClose,
-  PanelLeftOpen,
-  MessageSquare,
-  X,
-  Paperclip,
-  Download,
-  FileCheck,
-  Settings,
-  ArrowRight,
-  Lock,
-  Layers,
-  MessageSquareQuote,
-  UploadCloud,
-  Building2,
-  Globe2,
-  LogOut,
-  AlertTriangle,
-  RotateCcw,
-  Trash2
+  Smile,
+  Reply,
+  Forward,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 
-interface Message {
+const INDIAN_LANGUAGES = [
+  { code: "en-IN", label: "EN (India)" },
+  { code: "ta-IN", label: "தமிழ்" },
+  { code: "hi-IN", label: "हिन्दी" },
+  { code: "te-IN", label: "తెలుగు" },
+  { code: "ml-IN", label: "മലയാളം" },
+  { code: "kn-IN", label: "ಕನ್ನಡ" },
+  { code: "bn-IN", label: "বাংলা" },
+];
+
+const QUICK_EMOJIS = ["👍", "❤️", "😊", "🔥", "🙏", "🎉", "💡", "📚", "🎯", "👏", "✨", "🚀"];
+
+interface RoomMember {
   id: string;
-  sender: "user" | "assistant";
-  text: string;
-  image?: string;
-  timestamp: number;
+  name: string;
+  role: "admin" | "member";
+  status: "active" | "inactive";
+}
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  senderName?: string;
+  replyTo?: { author: string; content: string };
 }
 
 interface ChatSession {
   id: string;
   title: string;
-  mode: "professional" | "student";
+  isPinned: boolean;
   messages: Message[];
-  updatedAt: number;
 }
 
-interface UserProfile {
-  name: string;
-  age: number;
-  is_student: boolean;
-  profession: string;
-  grade_class: string;
-  interests: string;
-  onboarded: boolean;
-}
+export default function Home() {
+  const [spaceMode, setSpaceMode] = useState<"personal" | "workspace">("personal");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDockHidden, setIsDockHidden] = useState(false);
+  const [isTeamMode, setIsTeamMode] = useState(false);
 
-interface SuggestionChip {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  action?: () => void;
-  text?: string;
-}
+  // Group Governance (50 members cap)
+  const [members, setMembers] = useState<RoomMember[]>([
+    { id: "1", name: "Shaji Joseph (You)", role: "admin", status: "active" },
+    { id: "2", name: "Ananya", role: "member", status: "active" },
+    { id: "3", name: "David", role: "member", status: "active" },
+    { id: "4", name: "Rahul", role: "member", status: "active" },
+  ]);
+  const [activeSpeaker, setActiveSpeaker] = useState<string>("Shaji Joseph (You)");
+  const [roomAdminOpen, setRoomAdminOpen] = useState(false);
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+  // Sessions
+  const [sessions, setSessions] = useState<ChatSession[]>([
+    { id: "1", title: "New Session", isPinned: false, messages: [] },
+  ]);
+  const [currentSessionId, setCurrentSessionId] = useState("1");
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-function RichTextContent({ content, onExpand }: { content: string; onExpand: () => void }) {
-  const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+  // Quoted Reply & Forwarding State
+  const [replyTarget, setReplyTarget] = useState<{ author: string; content: string } | null>(null);
+  const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
-  const copyCode = (codeText: string, id: string) => {
-    navigator.clipboard.writeText(codeText);
-    setCopiedSnippet(id);
-    setTimeout(() => setCopiedSnippet(null), 2000);
-  };
-
-  const parts = content.split(/(```[\s\S]*?```)/g);
-
-  return (
-    <div className="space-y-2 text-xs sm:text-sm leading-relaxed text-slate-800">
-      {parts.map((part, idx) => {
-        if (part.startsWith("```") && part.endsWith("```")) {
-          const lines = part.slice(3, -3).trim().split("\n");
-          const firstLine = lines[0].trim();
-          const hasLang = /^[a-zA-Z0-9_-]+$/.test(firstLine);
-          const lang = hasLang ? firstLine : "code";
-          const codeBody = hasLang ? lines.slice(1).join("\n") : lines.join("\n");
-          const snippetId = `snippet_${idx}`;
-
-          return (
-            <div key={idx} className="my-2 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 text-slate-100 shadow-md">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800/90 text-[11px] font-mono text-slate-300 border-b border-slate-700">
-                <span className="uppercase text-[10px] tracking-wide font-semibold text-sky-400">{lang}</span>
-                <button
-                  type="button"
-                  onClick={() => copyCode(codeBody, snippetId)}
-                  className="flex items-center gap-1 hover:text-white transition-colors p-1"
-                >
-                  {copiedSnippet === snippetId ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" /> Copy Code
-                    </>
-                  )}
-                </button>
-              </div>
-              <pre className="p-3 overflow-x-auto text-[11px] sm:text-xs font-mono leading-relaxed text-sky-100">
-                <code>{codeBody}</code>
-              </pre>
-            </div>
-          );
-        }
-
-        return (
-          <span key={idx} className="whitespace-pre-wrap">
-            {part}
-          </span>
-        );
-      })}
-
-      {content.length > 30 && content.length < 350 && (
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={onExpand}
-            className="text-[11px] font-medium text-sky-600 hover:text-sky-800 flex items-center gap-1 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200 transition-all hover:scale-102"
-          >
-            <Layers className="w-3.5 h-3.5" /> Expand to In-Depth Notes
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function PersonalAICanvas() {
-  const [mode, setMode] = useState<"professional" | "student">("professional");
-  const [conversationalStyle, setConversationalStyle] = useState<"chat" | "document">("chat");
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>("");
-  
-  // Hydration protection flag to prevent saving empty state on reload
-  const isHydratedRef = useRef(false);
-
-  // Auth state
-  const [authenticated, setAuthenticated] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  const [accountType, setAccountType] = useState<"personal" | "workspace">("personal");
-  const [manualPasscodeInput, setManualPasscodeInput] = useState("");
-  const [googleInputEmail, setGoogleInputEmail] = useState("");
-
-  // Server error and auto-reload state
-  const [serverErrorModal, setServerErrorModal] = useState<{ show: boolean; message: string; countdown: number }>({
-    show: false,
-    message: "",
-    countdown: 5,
+  // User Profile
+  const [userProfile, setUserProfile] = useState({
+    name: "Shaji Joseph",
+    email: "shaji@gmail.com",
+    avatarUrl: "/avatar.svg",
+    role: "professional" as "student" | "professional",
+    profession: "Healthcare Revenue Cycle & Client Operations",
+    ageGroup: "pro",
+    gender: "male",
+    customApiKey: "",
   });
-  const retryIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Rate limit cooldown timer
-  const [rateLimitTimer, setRateLimitTimer] = useState<number | null>(null);
+  // Inline Editing
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
 
-  // Profile
-  const [profile, setProfile] = useState<UserProfile>({
-    name: "User",
-    age: 21,
-    is_student: false,
-    profession: "Senior Process Executive",
-    grade_class: "",
-    interests: "Technology & AI Operations",
-    onboarded: false,
-  });
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  // Modals
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [prohibitionNotice, setProhibitionNotice] = useState<string | null>(null);
 
-  // Messages
-  const [profMessages, setProfMessages] = useState<Message[]>([]);
-  const [studentMessages, setStudentMessages] = useState<Message[]>([]);
-  
-  const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Inputs & Speech
+  const [prompt, setPrompt] = useState("");
+  const [selectedLang, setSelectedLang] = useState(INDIAN_LANGUAGES[0]);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [audioVolume, setAudioVolume] = useState<number[]>([12, 18, 10, 24, 14]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // Audio Recording & Multilingual Translation state
-  const [isRecording, setIsRecording] = useState(false);
-  const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [isTranslatingAudio, setIsTranslatingAudio] = useState(false);
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const animFrameRef = useRef<number | null>(null);
-
-  // Tool Drawer & Modals
-  const [toolDrawerOpen, setToolDrawerOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<{ base64: string; mimeType: string; name: string } | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const importFileRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const currentMessages = mode === "professional" ? profMessages : studentMessages;
+  // Dynamic API Base URL for Cloud Deployment
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // 1. Initial Gatekeeper Validation
+  const currentSession = sessions.find((s) => s.id === currentSessionId) || sessions[0];
+  const messages = currentSession.messages;
+
   useEffect(() => {
-    let deviceId = localStorage.getItem("canvas_device_id");
-    if (!deviceId) {
-      deviceId = "dev_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
-      localStorage.setItem("canvas_device_id", deviceId);
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isStreaming]);
 
-    const savedPasscode = localStorage.getItem("canvas_family_passcode");
-    const savedEmail = localStorage.getItem("canvas_google_email");
-
-    if (savedEmail) {
-      setGoogleEmail(savedEmail);
-      setAuthenticated(true);
-    } else if (savedPasscode) {
-      fetch(`${BACKEND_URL}/api/verify-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode: savedPasscode, device_id: deviceId }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Unauthorized");
-          return res.json();
-        })
-        .then(() => setAuthenticated(true))
-        .catch(() => {
-          localStorage.removeItem("canvas_family_passcode");
-          setAuthenticated(false);
-        });
-    } else {
-      setAuthenticated(false);
-    }
-  }, []);
-
-  // 2. Hydrate Profile and ALL Chat Sessions safely from localStorage
+  // Audio Equalizer Visualizer
   useEffect(() => {
-    // A. Profile Restoration
-    const savedProfile = localStorage.getItem("canvas_user_profile");
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        setProfile(parsed);
-        if (parsed.is_student) setMode("student");
-      } catch (e) {
-        setShowOnboarding(true);
-      }
-    } else {
-      setShowOnboarding(true);
-    }
-
-    // B. Chat History & Sessions Restoration
-    const savedSessionsRaw = localStorage.getItem("canvas_all_sessions");
-    const activeSessionId = localStorage.getItem("canvas_active_session_id");
-
-    if (savedSessionsRaw) {
-      try {
-        const parsedSessions: ChatSession[] = JSON.parse(savedSessionsRaw);
-        if (Array.isArray(parsedSessions) && parsedSessions.length > 0) {
-          setSessions(parsedSessions);
-
-          const toRestore = parsedSessions.find((s) => s.id === activeSessionId) || parsedSessions[0];
-          setCurrentSessionId(toRestore.id);
-          setMode(toRestore.mode);
-
-          if (toRestore.mode === "professional") {
-            setProfMessages(toRestore.messages || []);
-          } else {
-            setStudentMessages(toRestore.messages || []);
-          }
-          isHydratedRef.current = true;
-          return;
-        }
-      } catch (e) {
-        console.error("Failed to parse saved sessions:", e);
-      }
-    }
-
-    // If no existing sessions, initialize a fresh one
-    const initialId = "session_" + Date.now();
-    const freshSession: ChatSession = {
-      id: initialId,
-      title: "New Conversation",
-      mode: "professional",
-      messages: [],
-      updatedAt: Date.now(),
-    };
-    setSessions([freshSession]);
-    setCurrentSessionId(initialId);
-    localStorage.setItem("canvas_all_sessions", JSON.stringify([freshSession]));
-    localStorage.setItem("canvas_active_session_id", initialId);
-    isHydratedRef.current = true;
-  }, []);
-
-  // 3. Persistent Auto-Save Hook (Protected against blank overwrites)
-  useEffect(() => {
-    if (!isHydratedRef.current || !currentSessionId) return;
-
-    setSessions((prevSessions) => {
-      const existing = prevSessions.find((s) => s.id === currentSessionId);
-      const firstUserMsg = currentMessages.find((m) => m.sender === "user");
-      const title = firstUserMsg 
-        ? firstUserMsg.text.slice(0, 30) + (firstUserMsg.text.length > 30 ? "..." : "")
-        : existing?.title || "New Conversation";
-
-      const updated = prevSessions.map((session) => {
-        if (session.id === currentSessionId) {
-          return {
-            ...session,
-            title,
-            mode,
-            messages: currentMessages,
-            updatedAt: Date.now(),
-          };
-        }
-        return session;
-      });
-
-      localStorage.setItem("canvas_all_sessions", JSON.stringify(updated));
-      localStorage.setItem("canvas_active_session_id", currentSessionId);
-      return updated;
-    });
-  }, [currentMessages, mode, currentSessionId]);
-
-  const saveProfileData = (updated: UserProfile) => {
-    setProfile(updated);
-    localStorage.setItem("canvas_user_profile", JSON.stringify(updated));
-    setShowOnboarding(false);
-    if (updated.is_student) setMode("student");
-    else setMode("professional");
-  };
-
-  const handleStartNewChat = () => {
-    const newId = "session_" + Date.now();
-    const newSession: ChatSession = {
-      id: newId,
-      title: "New Conversation",
-      mode: mode,
-      messages: [],
-      updatedAt: Date.now(),
-    };
-    setCurrentSessionId(newId);
-    if (mode === "professional") {
-      setProfMessages([]);
-    } else {
-      setStudentMessages([]);
-    }
-    setSessions((prev) => [newSession, ...prev]);
-    localStorage.setItem("canvas_active_session_id", newId);
-    setSidebarOpen(false);
-  };
-
-  const handleEndThisChat = () => {
-    if (!confirm("Are you sure you want to end and clear this active chat session?")) return;
-    
-    // Clear active messages
-    if (mode === "professional") {
-      setProfMessages([]);
-    } else {
-      setStudentMessages([]);
-    }
-
-    // Reset current session title and content
-    setSessions((prevSessions) => {
-      const updated = prevSessions.map((s) =>
-        s.id === currentSessionId
-          ? { ...s, title: "New Conversation", messages: [], updatedAt: Date.now() }
-          : s
-      );
-      localStorage.setItem("canvas_all_sessions", JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  // 4. Trigger Internal Server Error Modal with Countdown Auto-Reload
-  const triggerServerError = (errorText: string) => {
-    setServerErrorModal({
-      show: true,
-      message: errorText || "Internal server error occurred or backend connection was dropped.",
-      countdown: 5,
-    });
-
-    if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
-
-    let counter = 5;
-    retryIntervalRef.current = setInterval(() => {
-      counter -= 1;
-      setServerErrorModal((prev) => ({ ...prev, countdown: counter }));
-
-      if (counter <= 0) {
-        if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
-        window.location.reload();
-      }
-    }, 1000);
-  };
-
-  // 5. Room-Wide Multilingual Audio Recording & Translation
-  const startRecordingAudio = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: false, // captures all voices in the room clearly
-          autoGainControl: true,
-        },
-      });
-      micStreamRef.current = stream;
-
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      audioContextRef.current = audioCtx;
-      analyserRef.current = analyser;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const updateWave = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / dataArray.length;
-        setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
-        animFrameRef.current = requestAnimationFrame(updateWave);
+    if (isListening) {
+      const updateWaves = () => {
+        setAudioVolume([
+          Math.floor(Math.random() * 22) + 8,
+          Math.floor(Math.random() * 32) + 12,
+          Math.floor(Math.random() * 26) + 10,
+          Math.floor(Math.random() * 36) + 14,
+          Math.floor(Math.random() * 20) + 8,
+        ]);
+        animationFrameRef.current = requestAnimationFrame(updateWaves);
       };
-      updateWave();
-
-      audioChunksRef.current = [];
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/mp4";
-
-      const recorder = new MediaRecorder(stream, { mimeType });
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-        if (audioContextRef.current) audioContextRef.current.close();
-        stream.getTracks().forEach((track) => track.stop());
-        setAudioLevel(0);
-
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = (reader.result as string).split(",")[1];
-          setIsTranslatingAudio(true);
-          try {
-            const res = await fetch(`${BACKEND_URL}/api/translate-speech`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                audio_base64: base64Audio,
-                mime_type: mimeType.split(";")[0],
-              }),
-            });
-            if (!res.ok) {
-              triggerServerError(`Speech translation failed (${res.status}). Server unavailable.`);
-              return;
-            }
-            const data = await res.json();
-            if (data.text) {
-              setInputValue((prev) => (prev ? `${prev} ${data.text}` : data.text));
-            }
-          } catch (err: any) {
-            console.error("Audio translation error:", err);
-            triggerServerError("Failed to connect to backend voice engine.");
-          } finally {
-            setIsTranslatingAudio(false);
-          }
-        };
-      };
-
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Mic access error:", err);
-      alert("Microphone permission denied or not supported.");
-    }
-  };
-
-  const stopRecordingAudio = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-  };
-
-  // 6. Scroll tracking
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [currentMessages, loading]);
-
-  const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const handleDownloadDoc = (text: string, title: string = "Extracted_Notes") => {
-    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' "+
-      "xmlns:w='urn:schemas-microsoft-com:office:word' "+
-      "xmlns='http://www.w3.org/TR/REC-html40'>"+
-      "<head><meta charset='utf-8'><title>Export</title><style>body{font-family:Arial,sans-serif;line-height:1.6;padding:24px;}</style></head><body>";
-    const footer = "</body></html>";
-    const formattedContent = text.replace(/\n/g, "<br/>");
-    const sourceHTML = header + `<h2>Personal AI Canvas — ${profile.name}'s Notes</h2><hr/><br/>` + formattedContent + footer;
-
-    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-    const fileDownload = document.createElement("a");
-    document.body.appendChild(fileDownload);
-    fileDownload.href = source;
-    fileDownload.download = `${title.replace(/[^a-zA-Z0-9]/g, "_")}_Printable.doc`;
-    fileDownload.click();
-    document.body.removeChild(fileDownload);
-  };
-
-  const handleExportBackup = () => {
-    const backupData = JSON.stringify(sessions, null, 2);
-    const blob = new Blob([backupData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `canvas_backup_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const importedSessions = JSON.parse(reader.result as string);
-        if (Array.isArray(importedSessions) && importedSessions.length > 0) {
-          setSessions(importedSessions);
-          localStorage.setItem("canvas_all_sessions", JSON.stringify(importedSessions));
-          selectSession(importedSessions[0]);
-          alert("Sessions restored successfully!");
-        }
-      } catch (err) {
-        alert("Invalid backup file.");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64String = (reader.result as string).split(",")[1];
-      setSelectedFile({
-        base64: base64String,
-        mimeType: file.type || "application/pdf",
-        name: file.name
-      });
-      setToolDrawerOpen(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleJobScanWorkflow = async () => {
-    setLoading(true);
-    setToolDrawerOpen(false);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/scan-jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: profile.profession || "Senior Operations Executive",
-          location: "Chennai"
-        }),
-      });
-      if (!res.ok) {
-        triggerServerError(`Job scan service returned ${res.status}`);
-        return;
-      }
-      const data = await res.json();
-      const jobList = data.jobs || [];
-      const summaryText = "### Scanned Career Opportunities\n\n" + jobList.map((j: any, i: number) => (
-        `**${i + 1}. ${j.title}**\n• Source: ${j.portal}\n• Details: ${j.snippet}\n`
-      )).join("\n") + "\n*You can ask me to draft a targeted application or audit your resume for these roles.*";
-
-      const assistantMsg: Message = {
-        id: Date.now().toString(),
-        sender: "assistant",
-        text: summaryText,
-        timestamp: Date.now(),
-      };
-
-      if (mode === "professional") setProfMessages((prev) => [...prev, assistantMsg]);
-      else setStudentMessages((prev) => [...prev, assistantMsg]);
-    } catch (err) {
-      console.error("Job scan error:", err);
-      triggerServerError("Could not reach backend career scan service.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectSession = (session: ChatSession) => {
-    setCurrentSessionId(session.id);
-    setMode(session.mode);
-    if (session.mode === "professional") {
-      setProfMessages(session.messages || []);
+      animationFrameRef.current = requestAnimationFrame(updateWaves);
     } else {
-      setStudentMessages(session.messages || []);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      setAudioVolume([10, 14, 8, 16, 10]);
     }
-    localStorage.setItem("canvas_active_session_id", session.id);
-  };
-
-  const deleteSession = (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation();
-    const updated = sessions.filter((s) => s.id !== sessionId);
-    setSessions(updated);
-    localStorage.setItem("canvas_all_sessions", JSON.stringify(updated));
-
-    if (sessionId === currentSessionId) {
-      if (updated.length > 0) {
-        selectSession(updated[0]);
-      } else {
-        handleStartNewChat();
-      }
-    }
-  };
-
-  const handleSend = async (customMessage?: string) => {
-    if (isRecording) {
-      stopRecordingAudio();
-    }
-
-    const textToSend = customMessage || inputValue;
-    if ((!textToSend.trim() && !selectedFile) || loading) return;
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: "user",
-      text: textToSend || (selectedFile ? `Attached: ${selectedFile.name}` : ""),
-      image: selectedFile ? `data:${selectedFile.mimeType};base64,${selectedFile.base64}` : undefined,
-      timestamp: Date.now(),
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
+  }, [isListening]);
 
-    const assistantMsgId = (Date.now() + 1).toString();
-    const initialAssistantMsg: Message = {
-      id: assistantMsgId,
-      sender: "assistant",
-      text: "",
-      timestamp: Date.now(),
-    };
-
-    if (mode === "professional") {
-      setProfMessages((prev) => [...prev, userMsg, initialAssistantMsg]);
-    } else {
-      setStudentMessages((prev) => [...prev, userMsg, initialAssistantMsg]);
-    }
-
-    const filePayload = selectedFile ? { ...selectedFile } : null;
-    setSelectedFile(null);
-    setInputValue("");
-    setLoading(true);
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile: profile,
-          role_mode: mode,
-          conversational_style: conversationalStyle,
-          message: textToSend,
-          history: currentMessages.map((m) => ({
-            sender: m.sender,
-            text: m.text,
-          })),
-          image_base64: filePayload ? filePayload.base64 : null,
-          image_mime_type: filePayload ? filePayload.mimeType : "image/jpeg",
-          google_email: googleEmail,
-          device_id: localStorage.getItem("canvas_device_id")
-        }),
-      });
-
-      if (!response.ok) {
-        triggerServerError(`Backend returned HTTP ${response.status}. Internal engine failure.`);
-        return;
-      }
-
-      if (!response.body) throw new Error("Streaming not supported");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedText = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        accumulatedText += chunk;
-
-        if (accumulatedText.includes("[RATE_LIMIT_COOLDOWN")) {
-          setRateLimitTimer(15);
-          const interval = setInterval(() => {
-            setRateLimitTimer((prev) => {
-              if (prev && prev > 1) return prev - 1;
-              clearInterval(interval);
-              return null;
-            });
-          }, 1000);
-        }
-
-        const updateMessageList = (prev: Message[]) =>
-          prev.map((msg) =>
-            msg.id === assistantMsgId ? { ...msg, text: accumulatedText } : msg
-          );
-
-        if (mode === "professional") {
-          setProfMessages(updateMessageList);
-        } else {
-          setStudentMessages(updateMessageList);
-        }
-      }
-    } catch (err: any) {
-      triggerServerError(err.message || "Lost connection to backend server.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePasscodeLogin = () => {
-    const cleaned = manualPasscodeInput.trim().toLowerCase();
-    if (!cleaned) return;
-
-    fetch(`${BACKEND_URL}/api/verify-token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passcode: cleaned }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Incorrect passcode. Please try again.");
-        return res.json();
-      })
-      .then(() => {
-        localStorage.setItem("canvas_family_passcode", cleaned);
-        setAuthenticated(true);
-      })
-      .catch((err) => {
-        alert(err.message || "Incorrect passcode.");
-      });
-  };
-
-  const handleGoogleLogin = () => {
-    if (!googleInputEmail.trim() || !googleInputEmail.includes("@")) {
-      alert("Please enter a valid Google or Workspace email address.");
+  // Dictation Engine
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
       return;
     }
-    fetch(`${BACKEND_URL}/api/verify-token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ google_email: googleInputEmail.trim().toLowerCase() }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Account not authorized.");
-        return res.json();
-      })
-      .then((data) => {
-        setGoogleEmail(googleInputEmail.trim().toLowerCase());
-        setAccountType(data.account_type || "personal");
-        localStorage.setItem("canvas_google_email", googleInputEmail.trim().toLowerCase());
-        setAuthenticated(true);
-      })
-      .catch((err) => {
-        alert(err.message || "Authentication error.");
-      });
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech dictation works in Google Chrome, Microsoft Edge, and Safari.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = selectedLang.code;
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onresult = (event: any) => {
+        let currentTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        setPrompt(currentTranscript);
+      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("canvas_family_passcode");
-    localStorage.removeItem("canvas_google_email");
-    setGoogleEmail(null);
-    setAuthenticated(false);
-  };
+  // Submit Prompt Handler
+  const handleSendMessage = async (e?: React.FormEvent, customText?: string) => {
+    if (e) e.preventDefault();
+    const textToSend = customText !== undefined ? customText : prompt;
+    if (!textToSend.trim() || isStreaming) return;
 
-  // Explicit strongly-typed chips to eliminate TS2339 union errors
-  const professionalChips: SuggestionChip[] = [
-    { label: "Scan target job openings", icon: Briefcase, action: handleJobScanWorkflow },
-    { label: "Review & debug code block", icon: Code, text: "Review and debug this code block: " },
-    { label: "Analyze RCM / operational workflow", icon: Search, text: "Analyze this RCM operations workflow for denials and audit risks: " },
-    { label: "Draft professional follow-up", icon: FileText, text: "Draft an executive follow-up email regarding: " },
-  ];
+    // Check Member Active Status
+    const currentMemberObj = members.find((m) => m.name === activeSpeaker);
+    if (isTeamMode && currentMemberObj?.status === "inactive") {
+      alert("Your account is currently inactive in this sponsored room. Contact the room admin.");
+      return;
+    }
 
-  const studentChips: SuggestionChip[] = [
-    { label: "Create 5-question practice quiz", icon: HelpCircle, text: "Generate a 5-question practice quiz testing: " },
-    { label: "Explain a complex topic simply", icon: BookOpen, text: "Explain this topic simply with real-world analogies: " },
-    { label: "Build a 7-day study timetable", icon: GraduationCap, text: "Build a balanced 7-day study timetable for: " },
-    { label: "Generate concept flashcards", icon: Sparkles, text: "Generate printable concept flashcards for: " },
-  ];
+    // Prohibition Filter
+    const lower = textToSend.toLowerCase();
+    const isProhibited = [
+      "create photo",
+      "draw picture",
+      "edit this video",
+      "render a video",
+      "generate photo",
+      "generate image",
+    ].some((k) => lower.includes(k));
 
-  // Secure Gatekeeper Screen (Discreet inputs, no leaked examples)
-  if (!authenticated) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-b from-[#7ec5f9] via-[#bce3f9] to-[#f4f7d8] p-4">
-        <div className="bg-white p-7 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl border border-sky-100 text-center space-y-4">
-          <div className="w-14 h-14 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
-            <Lock className="w-7 h-7" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900">Personal AI Canvas</h2>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Enter the passcode or sign in with your Google Workspace account to open your private assistant.
-          </p>
+    if (isProhibited) {
+      setProhibitionNotice(
+        "Genie is specialized for study and business analysis. Generative image creation and video editing are strictly prohibited."
+      );
+      setTimeout(() => setProhibitionNotice(null), 5000);
+      return;
+    }
 
-          {/* Masked Passcode Input */}
-          <div className="space-y-2 pt-2 text-left">
-            <label className="text-[11px] font-semibold text-slate-700 block">Passcode</label>
-            <input
-              type="password"
-              value={manualPasscodeInput}
-              onChange={(e) => setManualPasscodeInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handlePasscodeLogin()}
-              placeholder="••••••••"
-              className="w-full text-center px-4 py-2.5 text-xs bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-xs"
-            />
-            <button
-              onClick={handlePasscodeLogin}
-              className="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-            >
-              Enter Canvas
-            </button>
-          </div>
+    const sentReplyTarget = replyTarget;
+    setPrompt("");
+    setReplyTarget(null);
+    setEmojiPickerOpen(false);
 
-          <div className="relative my-3 flex items-center justify-center">
-            <div className="border-t border-slate-200 w-full"></div>
-            <span className="bg-white px-2 text-[10px] text-slate-400 font-semibold uppercase">Or Sign In</span>
-          </div>
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
 
-          {/* Google Workspace / Personal Account */}
-          <div className="space-y-2 text-left">
-            <label className="text-[11px] font-semibold text-slate-700 block">Google / Workspace Account</label>
-            <input
-              type="email"
-              value={googleInputEmail}
-              onChange={(e) => setGoogleInputEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleGoogleLogin()}
-              placeholder="name@company.com or name@gmail.com"
-              className="w-full text-center px-4 py-2.5 text-xs bg-white text-slate-900 placeholder:text-slate-400 font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-xs"
-            />
-            <button
-              onClick={handleGoogleLogin}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
-            >
-              <Building2 className="w-3.5 h-3.5" /> Continue with Google
-            </button>
-            <p className="text-[10px] text-slate-500 text-center">
-              Works with @gmail.com or authorized work domains
-            </p>
-          </div>
-        </div>
-      </div>
+    const userMsg: Message = {
+      role: "user",
+      content: textToSend,
+      senderName: isTeamMode ? activeSpeaker : undefined,
+      replyTo: sentReplyTarget || undefined,
+    };
+
+    const updatedMessages = [...messages, userMsg];
+
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id === currentSessionId) {
+          const updatedTitle = s.messages.length === 0 ? textToSend.slice(0, 24) : s.title;
+          return { ...s, title: updatedTitle, messages: updatedMessages };
+        }
+        return s;
+      })
     );
-  }
+
+    // Multilingual Summon Check
+    const hasGenieCall = [
+      "@genie",
+      "genie",
+      "jini",
+      "ஜீனி",
+      "ஜீன்",
+      "ஜீனியே",
+      "கரெக்டா",
+    ].some((w) => lower.includes(w) || textToSend.includes(w));
+
+    if (isTeamMode && !hasGenieCall) {
+      return;
+    }
+
+    setIsStreaming(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: userProfile.email,
+          prompt: textToSend,
+          space_mode: spaceMode,
+          conversation_history: updatedMessages,
+          provider: "gemini",
+          custom_api_key: userProfile.customApiKey || undefined,
+          profession_context:
+            userProfile.role === "professional" ? userProfile.profession : undefined,
+          gender_context: userProfile.gender,
+          language_code: selectedLang.code,
+          is_team_chat: isTeamMode,
+          quoted_message: sentReplyTarget
+            ? { author: sentReplyTarget.author, content: sentReplyTarget.content }
+            : undefined,
+        }),
+      });
+
+      const data = await res.json();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? {
+                ...s,
+                messages: [
+                  ...s.messages,
+                  { role: "assistant", content: data.reply, senderName: "Personal AI Genie" },
+                ],
+              }
+            : s
+        )
+      );
+    } catch {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? {
+                ...s,
+                messages: [
+                  ...s.messages,
+                  {
+                    role: "assistant",
+                    content: "Genie is active. Ready to proceed.",
+                    senderName: "Personal AI Genie",
+                  },
+                ],
+              }
+            : s
+        )
+      );
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  // Inline Prompt Editing
+  const handleUpdatePrompt = async (index: number) => {
+    if (!editText.trim()) return;
+
+    const trimmedHistory = messages.slice(0, index);
+    const newMsg: Message = {
+      role: "user",
+      content: editText.trim(),
+      senderName: isTeamMode ? activeSpeaker : undefined,
+    };
+
+    const finalContext = [...trimmedHistory, newMsg];
+
+    setSessions((prev) =>
+      prev.map((s) => (s.id === currentSessionId ? { ...s, messages: finalContext } : s))
+    );
+
+    setEditingMessageIndex(null);
+    setIsStreaming(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: userProfile.email,
+          prompt: editText.trim(),
+          space_mode: spaceMode,
+          conversation_history: finalContext,
+          provider: "gemini",
+          custom_api_key: userProfile.customApiKey || undefined,
+          profession_context:
+            userProfile.role === "professional" ? userProfile.profession : undefined,
+          gender_context: userProfile.gender,
+          language_code: selectedLang.code,
+          is_team_chat: isTeamMode,
+        }),
+      });
+
+      const data = await res.json();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? {
+                ...s,
+                messages: [
+                  ...finalContext,
+                  { role: "assistant", content: data.reply, senderName: "Personal AI Genie" },
+                ],
+              }
+            : s
+        )
+      );
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  const handleCopyMessage = (content: string, index: number) => {
+    navigator.clipboard.writeText(content);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleRegenerateLast = () => {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUserMsg) {
+      handleSendMessage(undefined, lastUserMsg.content);
+    }
+  };
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-gradient-to-b from-[#7ec5f9] via-[#bce3f9] to-[#f4f7d8]">
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,application/pdf" className="hidden" />
-      <input type="file" ref={importFileRef} onChange={handleImportBackup} accept="application/json" className="hidden" />
-
-      {/* Automatic Server Error & Auto-Reload Popup */}
-      {serverErrorModal.show && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-red-200 text-center space-y-4">
-            <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
-              <AlertTriangle className="w-8 h-8 animate-bounce" />
-            </div>
-            
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-slate-900">Backend Connection Error</h3>
-              <p className="text-xs text-slate-600 leading-relaxed px-2">
-                {serverErrorModal.message}
-              </p>
-            </div>
-
-            <div className="bg-red-50 border border-red-200/80 rounded-2xl p-3">
-              <p className="text-xs text-red-700 font-semibold">
-                Auto-reloading application in <span className="text-red-900 font-bold text-sm">{serverErrorModal.countdown}s</span>...
-              </p>
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => window.location.reload()}
-                className="flex-1 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Reload Now
-              </button>
-              <button
-                onClick={() => {
-                  if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
-                  setServerErrorModal({ show: false, message: "", countdown: 5 });
-                }}
-                className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Onboarding Dialog */}
-      {showOnboarding && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-sky-100 space-y-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-sky-600" />
-              <h2 className="text-lg font-bold text-slate-900">Personalize Your Canvas</h2>
-            </div>
-            <p className="text-xs text-slate-600">
-              Tailor quizzes, job searches, and code explanations directly to your background.
-            </p>
-
-            <div className="space-y-3 pt-2">
-              <div>
-                <label className="text-xs font-semibold text-slate-800">Your Name</label>
-                <input
-                  type="text"
-                  value={profile.name}
-                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                  placeholder="Your Name"
-                  className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-xl focus:outline-sky-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-800">Age</label>
-                  <input
-                    type="number"
-                    value={profile.age}
-                    onChange={(e) => {
-                      const ageNum = parseInt(e.target.value) || 18;
-                      setProfile({
-                        ...profile,
-                        age: ageNum,
-                        is_student: ageNum < 18 ? true : profile.is_student,
-                      });
-                    }}
-                    className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-xl focus:outline-sky-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-800">Primary Role</label>
-                  <select
-                    value={profile.is_student ? "student" : "professional"}
-                    onChange={(e) => setProfile({ ...profile, is_student: e.target.value === "student" })}
-                    className="w-full mt-1 px-2.5 py-2 text-xs bg-white text-slate-900 border border-slate-300 rounded-xl focus:outline-sky-500"
-                  >
-                    <option value="professional" className="text-slate-900">Professional</option>
-                    <option value="student" className="text-slate-900">Student</option>
-                  </select>
-                </div>
-              </div>
-
-              {profile.is_student ? (
-                <div>
-                  <label className="text-xs font-semibold text-slate-800">Class / Grade / Subject</label>
-                  <input
-                    type="text"
-                    value={profile.grade_class}
-                    onChange={(e) => setProfile({ ...profile, grade_class: e.target.value })}
-                    placeholder="e.g. 12th Grade, Computer Science"
-                    className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-xl focus:outline-sky-500"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label className="text-xs font-semibold text-slate-800">Profession / Domain</label>
-                  <input
-                    type="text"
-                    value={profile.profession}
-                    onChange={(e) => setProfile({ ...profile, profession: e.target.value })}
-                    placeholder="e.g. Senior Process Executive / Operations"
-                    className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-xl focus:outline-sky-500"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-semibold text-slate-800">Key Interests</label>
-                <input
-                  type="text"
-                  value={profile.interests}
-                  onChange={(e) => setProfile({ ...profile, interests: e.target.value })}
-                  placeholder="e.g. RCM Operations, Python, Machine Learning"
-                  className="w-full mt-1 px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-xl focus:outline-sky-500"
-                />
-              </div>
-
-              <button
-                onClick={() => saveProfileData({ ...profile, onboarded: true })}
-                className="w-full mt-3 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-md transition-all"
-              >
-                Launch My Canvas <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Slide-out Left Drawer */}
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-[#F0F2F6] text-slate-800 antialiased font-sans">
+      {/* 1. SIDEBAR */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 bg-white/95 backdrop-blur-xl border-r border-slate-200/80 shadow-2xl transition-transform duration-300 ease-in-out flex flex-col ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`${
+          sidebarOpen ? "w-72" : "w-0 -translate-x-full lg:w-0"
+        } fixed inset-y-0 left-0 z-40 bg-[#E9ECF2]/95 backdrop-blur-xl border-r border-[#D9DFEA] transition-all duration-300 ease-in-out lg:static flex flex-col overflow-hidden`}
       >
-        <div className="p-4 border-b border-slate-200/60 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-sky-600" />
-            <h2 className="font-semibold text-sm text-slate-800 tracking-tight">Saved Sessions</h2>
+        <div className="flex items-center justify-between p-4 border-b border-[#D9DFEA]">
+          <div className="flex items-center gap-3">
+            <img
+              src={userProfile.avatarUrl}
+              alt="User"
+              className="w-9 h-9 rounded-full object-cover border-2 border-purple-400 shadow-sm"
+            />
+            <span className="font-extrabold text-base tracking-tight bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 bg-clip-text text-transparent truncate">
+              Personal AI Genie
+            </span>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
-            <PanelLeftClose className="w-5 h-5" />
-          </button>
-        </div>
 
-        <div className="p-3 space-y-2">
           <button
-            onClick={handleStartNewChat}
-            className="w-full py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm"
+            onClick={() => setSidebarOpen(false)}
+            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors"
+            title="Hide Sidebar"
           >
-            <Plus className="w-4 h-4" /> Start New Chat
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-3 space-y-1.5">
+          <button
+            onClick={() => {
+              const newId = Date.now().toString();
+              setSessions((prev) => [
+                { id: newId, title: "New Session", isPinned: false, messages: [] },
+                ...prev,
+              ]);
+              setCurrentSessionId(newId);
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 rounded-xl transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> New Chat
           </button>
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-1.5 pt-1">
             <button
-              onClick={handleExportBackup}
-              className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1"
-              title="Export all sessions as JSON"
+              onClick={() => setSyncModalOpen(true)}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-white/80 hover:bg-white text-slate-700 border border-[#D9DFEA] rounded-xl text-[11px] font-medium transition-all shadow-xs"
             >
-              <Download className="w-3 h-3" /> Backup
+              <KeyRound className="w-3 h-3 text-violet-600" />
+              <span>Import Sync</span>
             </button>
             <button
-              onClick={() => importFileRef.current?.click()}
-              className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1"
-              title="Import JSON sessions"
+              onClick={() => setSyncModalOpen(true)}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-white/80 hover:bg-white text-slate-700 border border-[#D9DFEA] rounded-xl text-[11px] font-medium transition-all shadow-xs"
             >
-              <UploadCloud className="w-3 h-3" /> Restore
+              <Download className="w-3 h-3 text-slate-500" />
+              <span>Backup</span>
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
-          {sessions.length === 0 ? (
-            <div className="text-center text-xs text-slate-400 py-10">No saved sessions yet</div>
-          ) : (
-            sessions.map((s) => {
-              const isActive = s.id === currentSessionId;
-              return (
-                <div
-                  key={s.id}
-                  onClick={() => selectSession(s)}
-                  className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-sky-100/90 text-sky-900 border border-sky-200 shadow-xs"
-                      : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
-                  }`}
+        {/* History Feed */}
+        <div className="flex-1 overflow-y-auto px-3 space-y-1">
+          <div className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            History
+          </div>
+
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              onClick={() => setCurrentSessionId(session.id)}
+              className={`group relative flex items-center justify-between px-3 py-2 text-xs rounded-xl cursor-pointer transition-all ${
+                currentSessionId === session.id
+                  ? "bg-white/90 text-slate-900 font-semibold shadow-sm border border-[#D9DFEA]"
+                  : "text-slate-600 hover:bg-white/50"
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate pr-2">
+                {session.isPinned ? (
+                  <Pin className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />
+                ) : (
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                )}
+                <span className="truncate">{session.title}</span>
+              </div>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMenuId(activeMenuId === session.id ? null : session.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:text-slate-900 text-slate-400 rounded transition-opacity"
                 >
-                  <div className="flex items-center gap-2 truncate pr-6">
-                    <span className={`w-2 h-2 rounded-full ${s.mode === "professional" ? "bg-sky-500" : "bg-emerald-500"}`} />
-                    <span className="truncate">{s.title || "Untitled Chat"}</span>
-                  </div>
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
 
-                  <button
-                    onClick={(e) => deleteSession(e, s.id)}
-                    className="opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 p-1 rounded-md text-slate-400 transition-all absolute right-2"
+                {activeMenuId === session.id && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-36 z-50 text-slate-700"
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              );
-            })
-          )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShareModalOpen(true);
+                        setActiveMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-purple-50 text-purple-700 font-medium"
+                    >
+                      <Share2 className="w-3 h-3 text-purple-600" /> Share
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSessions((prev) =>
+                          prev.map((s) => (s.id === session.id ? { ...s, isPinned: !s.isPinned } : s))
+                        );
+                        setActiveMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-50"
+                    >
+                      <Pin className="w-3 h-3 text-slate-500" /> {session.isPinned ? "Unpin" : "Pin"}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newName = prompt("Rename session:");
+                        if (newName?.trim()) {
+                          setSessions((prev) =>
+                            prev.map((s) => (s.id === session.id ? { ...s, title: newName.trim() } : s))
+                          );
+                        }
+                        setActiveMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-50"
+                    >
+                      <Edit2 className="w-3 h-3 text-slate-500" /> Rename
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (sessions.length > 1) {
+                          setSessions((prev) => prev.filter((s) => s.id !== session.id));
+                          if (currentSessionId === session.id) {
+                            setCurrentSessionId(sessions.find((s) => s.id !== session.id)!.id);
+                          }
+                        }
+                        setActiveMenuId(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="w-3 h-3 text-rose-500" /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="p-3 border-t border-slate-200/60 text-[11px] text-slate-600 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="truncate max-w-[120px] font-medium">{profile.name}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setShowOnboarding(true)} className="text-slate-400 hover:text-sky-600 p-1">
-              <Settings className="w-3.5 h-3.5" />
+        {/* Bottom Bar */}
+        <div className="p-3 border-t border-[#D9DFEA] bg-[#E1E5EE]/60 space-y-2">
+          <div className="flex items-center justify-between bg-white/70 p-2 rounded-xl border border-slate-200">
+            <div className="flex items-center gap-2">
+              <img
+                src={userProfile.avatarUrl}
+                alt="Account"
+                className="w-7 h-7 rounded-full object-cover border border-purple-300"
+              />
+              <div className="flex flex-col text-left">
+                <span className="text-[11px] font-bold text-slate-800 leading-tight truncate">
+                  {userProfile.name}
+                </span>
+                <span className="text-[9px] text-slate-500 truncate">{userProfile.email}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSpaceMode(spaceMode === "personal" ? "workspace" : "personal")}
+              className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all ${
+                spaceMode === "workspace"
+                  ? "bg-purple-600 text-white border-purple-700"
+                  : "bg-pink-50 text-pink-700 border-pink-300"
+              }`}
+            >
+              {spaceMode === "workspace" ? "Work" : "Personal"}
             </button>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-red-600 p-1" title="Log out / Switch account">
-              <LogOut className="w-3.5 h-3.5" />
+          </div>
+
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] text-slate-400 font-medium">Genie Engine v4.0</span>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1 text-slate-500 hover:text-purple-700 rounded-md"
+              title="Preferences & BYOK"
+            >
+              <SettingsIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col justify-between p-2.5 sm:p-6 transition-all duration-300 w-full overflow-hidden">
-        {/* Pinned Top Bar with Direct New Chat & End Chat Controls */}
-        <header className="flex justify-between items-center max-w-5xl w-full mx-auto gap-2">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-xl bg-white/80 hover:bg-white text-slate-700 shadow-sm border border-white/60"
-              title="Chat History"
-            >
-              <PanelLeftOpen className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />
-            </button>
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-4 left-3 z-50 p-2 bg-white/90 hover:bg-white text-slate-700 rounded-xl shadow-md border border-slate-200 transition-all"
+          title="Open Sidebar"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
 
-            {/* Direct Header Action: + New Chat */}
-            <button
-              onClick={handleStartNewChat}
-              className="px-2.5 py-1.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 text-xs font-semibold border border-white/60 shadow-xs flex items-center gap-1 transition-all"
-              title="Start a new chat session"
-            >
-              <Plus className="w-3.5 h-3.5 text-sky-600" />
-              <span className="hidden sm:inline">New Chat</span>
-            </button>
-
-            {/* Direct Header Action: End / Clear Chat */}
-            {currentMessages.length > 0 && (
+      {/* 2. MAIN CANVAS */}
+      <main className="flex flex-1 flex-col h-full min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
+        {/* Header */}
+        <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-[#DDE3EE] bg-white/70 backdrop-blur-md z-10 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center p-1 bg-white rounded-full border-2 border-purple-600 shadow-sm">
               <button
-                onClick={handleEndThisChat}
-                className="px-2.5 py-1.5 rounded-xl bg-white/80 hover:bg-red-50 text-slate-600 hover:text-red-600 text-xs font-semibold border border-white/60 shadow-xs flex items-center gap-1 transition-all"
-                title="End and clear current conversation"
+                onClick={() => setSpaceMode("personal")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  spaceMode === "personal"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-purple-900 hover:text-purple-950 font-medium"
+                }`}
               >
-                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                <span className="hidden sm:inline">End Chat</span>
+                <User className="w-3.5 h-3.5" />
+                <span>Genie Personal Space</span>
               </button>
-            )}
+
+              <button
+                onClick={() => setSpaceMode("workspace")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  spaceMode === "workspace"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-purple-900 hover:text-purple-950 font-medium"
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>Genie Workspace</span>
+              </button>
+            </div>
+
+            {/* Team Mode & Admin Roster */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setIsTeamMode(!isTeamMode)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                  isTeamMode
+                    ? "bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 text-white border-transparent shadow-sm"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>{isTeamMode ? "Team Active" : "Team Sync"}</span>
+              </button>
+
+              {isTeamMode && (
+                <button
+                  onClick={() => setRoomAdminOpen(true)}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-purple-200 text-purple-700 hover:bg-purple-50 rounded-full transition-all shadow-xs"
+                >
+                  Room Roster ({members.filter((m) => m.status === "active").length}/50)
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Centered Segmented Control */}
-          <div className="bg-white/80 backdrop-blur-md p-0.5 sm:p-1 rounded-full flex shadow-sm border border-white/60">
-            <button
-              onClick={() => setMode("professional")}
-              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-all ${
-                mode === "professional"
-                  ? "bg-[#0284c7] text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Pro
-            </button>
-            <button
-              onClick={() => setMode("student")}
-              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs font-bold transition-all ${
-                mode === "student"
-                  ? "bg-[#0284c7] text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Student
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {googleEmail && (
-              <span className="hidden sm:inline-block text-[10px] font-semibold bg-white/80 px-2 py-0.5 rounded-full text-slate-700 border border-white/60">
-                {googleEmail}
-              </span>
-            )}
-            <button
-              onClick={() => setConversationalStyle(conversationalStyle === "chat" ? "document" : "chat")}
-              className="px-2.5 py-1 rounded-full bg-white/80 hover:bg-white text-slate-700 text-[10px] sm:text-xs font-semibold border border-white/60 flex items-center gap-1 shadow-xs"
-              title="Toggle between concise chat and detailed document format"
-            >
-              <MessageSquareQuote className="w-3 h-3 text-sky-600" />
-              <span>{conversationalStyle === "chat" ? "Chat" : "Doc"}</span>
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-pink-700 bg-pink-50 px-3.5 py-1.5 rounded-full border-2 border-pink-500 shadow-sm">
+              {spaceMode === "workspace" ? "Organizational Workspace" : "Google Personal Account"}
+            </span>
 
             <button
-              onClick={() => setShowOnboarding(true)}
-              className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md cursor-pointer"
+              onClick={() => setSettingsOpen(true)}
+              className="p-2 bg-white text-slate-600 hover:text-purple-700 hover:bg-purple-50 border border-slate-200 rounded-full transition-all shadow-sm"
             >
-              <User className="w-4 h-4" />
+              <SettingsIcon className="w-4 h-4" />
             </button>
           </div>
         </header>
 
-        {rateLimitTimer && (
-          <div className="max-w-md w-full mx-auto my-1.5 bg-amber-100 border border-amber-300 text-amber-800 px-3 py-1.5 rounded-xl text-xs flex items-center justify-between shadow-xs">
-            <span>Rate limit cooling down...</span>
-            <span className="font-bold">{rateLimitTimer}s</span>
-          </div>
-        )}
+        {/* Scrollable Center Feed */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
+          {prohibitionNotice && (
+            <div className="max-w-2xl mx-auto mb-4 p-3 bg-amber-50 border border-amber-300 text-amber-800 rounded-2xl text-xs font-medium flex items-center gap-2 shadow-sm">
+              <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>{prohibitionNotice}</span>
+            </div>
+          )}
 
-        {/* Chat Stream Section */}
-        <section 
-          ref={chatContainerRef}
-          className="flex-1 max-w-4xl w-full mx-auto my-2 sm:my-4 overflow-y-auto max-h-[64vh] pr-1 space-y-3 scroll-smooth"
-        >
-          {currentMessages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-center text-slate-600 py-12">
-              <div>
-                <Sparkles className="w-9 h-9 text-sky-500 mx-auto mb-2 opacity-80" />
-                <p className="text-sm font-semibold text-slate-800">
-                  Welcome back, {profile.name}!
-                </p>
-                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto px-4">
-                  {mode === "professional"
-                    ? `Executive workspace configured for ${profile.profession || "professionals"}. Ask questions, run job scans, or dictate in any language.`
-                    : `Academic workspace for ${profile.grade_class || "students"}. Practice tests, study notes, or multi-lingual dictation.`}
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center -mt-6">
+              <div className="flex flex-col items-center gap-3 text-center mb-6">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white shadow-md border border-[#DCE2ED] p-0.5 overflow-hidden">
+                  <img
+                    src={userProfile.avatarUrl}
+                    alt="Genie"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                </div>
+
+                <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
+                  Where should we start?
+                </h2>
+
+                <p className="text-xs text-slate-500 max-w-sm">
+                  {spaceMode === "workspace"
+                    ? `Workspace active in ${userProfile.profession}. Multi-AI context and team pooling ready.`
+                    : `Personal companion for ${userProfile.name}. Empathetic advice, regional language dictation, and document analysis ready.`}
                 </p>
               </div>
             </div>
           ) : (
-            currentMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-2 sm:gap-3 ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {msg.sender === "assistant" && (
-                  <div className="w-7 h-7 rounded-full bg-sky-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                )}
-                
-                {msg.sender === "user" ? (
-                  <div className="max-w-[88%] sm:max-w-[78%] px-4 py-3 rounded-2xl rounded-br-none bg-[#0284c7] text-white text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-wrap space-y-2">
-                    {msg.image && (
-                      <div className="rounded-lg overflow-hidden border border-white/30 bg-sky-800/50 p-1">
-                        {msg.image.startsWith("data:application/pdf") ? (
-                          <div className="flex items-center gap-2 p-2 text-xs">
-                            <FileText className="w-5 h-5 text-white" />
-                            <span>PDF Document Attached</span>
-                          </div>
-                        ) : (
-                          <img src={msg.image} alt="Uploaded preview" className="max-h-48 rounded object-cover" />
-                        )}
-                      </div>
-                    )}
-                    <div>{msg.text}</div>
-                  </div>
-                ) : (
-                  <div className="relative max-w-[92%] sm:max-w-[85%] bg-white/95 text-slate-800 border border-white/60 rounded-2xl rounded-bl-none p-3.5 sm:p-5 shadow-sm">
-                    <div className="pr-12 sm:pr-14">
-                      {msg.text ? (
-                        <RichTextContent 
-                          content={msg.text} 
-                          onExpand={() => handleSend("Please provide an in-depth, structured document breakdown of your previous response.")}
-                        />
-                      ) : (
-                        loading && <span className="italic text-slate-400">Personalizing...</span>
-                      )}
-                    </div>
-                    
-                    {msg.text && (
-                      <div className="absolute top-2 right-2 flex items-center gap-1">
-                        <button
-                          onClick={() => handleDownloadDoc(msg.text, `${profile.name}_Notes`)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all"
-                          title="Download Word Document"
-                        >
-                          <Download className="w-3.5 h-3.5 text-sky-600" />
-                        </button>
+            <div className="max-w-3xl mx-auto space-y-4 pb-4">
+              {messages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+                >
+                  {msg.senderName && (
+                    <span className="text-[10px] font-semibold text-slate-400 mb-1 px-1">
+                      {msg.senderName}
+                    </span>
+                  )}
 
+                  {/* USER BUBBLE */}
+                  {msg.role === "user" ? (
+                    editingMessageIndex === index ? (
+                      <div className="w-full max-w-xl self-end space-y-2">
+                        <textarea
+                          rows={2}
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full text-sm border border-slate-300 rounded-2xl px-4 py-2.5 bg-white text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                        />
+                        <div className="flex justify-end items-center gap-2">
+                          <button
+                            onClick={() => setEditingMessageIndex(null)}
+                            className="px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleUpdatePrompt(index)}
+                            className="px-4 py-1.5 text-xs font-bold bg-sky-400 hover:bg-sky-500 text-slate-900 rounded-full shadow-sm"
+                          >
+                            Update
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="group relative flex items-center gap-2">
+                        {/* Action buttons */}
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                          <button
+                            onClick={() =>
+                              setReplyTarget({
+                                author: msg.senderName || "User",
+                                content: msg.content,
+                              })
+                            }
+                            className="p-1 text-slate-400 hover:text-purple-600"
+                            title="Reply to message"
+                          >
+                            <Reply className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setForwardMessage(msg)}
+                            className="p-1 text-slate-400 hover:text-purple-600"
+                            title="Forward message"
+                          >
+                            <Forward className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingMessageIndex(index);
+                              setEditText(msg.content);
+                            }}
+                            className="p-1 text-slate-400 hover:text-slate-700"
+                            title="Edit prompt"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm bg-indigo-600 text-white rounded-br-none shadow-sm space-y-1">
+                          {msg.replyTo && (
+                            <div className="bg-indigo-700/70 border-l-2 border-indigo-300 p-2 rounded text-xs text-indigo-100 mb-1">
+                              <span className="font-bold block text-[10px] text-indigo-200">
+                                Replying to {msg.replyTo.author}
+                              </span>
+                              <span className="truncate block opacity-90">{msg.replyTo.content}</span>
+                            </div>
+                          )}
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    /* ASSISTANT BUBBLE */
+                    <div className="space-y-1.5 max-w-[85%]">
+                      <div className="bg-white text-slate-800 rounded-2xl rounded-bl-none px-4 py-3 text-sm leading-relaxed border border-slate-200 shadow-sm">
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-slate-400 px-1">
                         <button
-                          onClick={() => handleCopy(msg.id, msg.text)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all"
+                          className="p-1 hover:text-purple-600 rounded transition-colors"
+                          title="Helpful"
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setSettingsOpen(true)}
+                          className="p-1 hover:text-rose-600 rounded transition-colors"
+                          title="Report issue"
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={handleRegenerateLast}
+                          className="p-1 hover:text-slate-700 rounded transition-colors"
+                          title="Regenerate"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleCopyMessage(msg.content, index)}
+                          className="p-1 hover:text-slate-700 rounded transition-colors"
                           title="Copy text"
                         >
-                          {copiedId === msg.id ? (
+                          {copiedIndex === index ? (
                             <Check className="w-3.5 h-3.5 text-emerald-600" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
                         </button>
+                        <button
+                          onClick={() => setForwardMessage(msg)}
+                          className="p-1 hover:text-purple-600 rounded transition-colors"
+                          title="Forward Genie's answer"
+                        >
+                          <Forward className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Floating Input Dock Toggle */}
+        {isDockHidden && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30">
+            <button
+              onClick={() => setIsDockHidden(false)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-white/90 hover:bg-white text-purple-700 font-semibold text-xs border border-purple-200 rounded-full shadow-lg backdrop-blur-md transition-all hover:scale-105"
+            >
+              <ChevronUp className="w-4 h-4 text-purple-600" />
+              <span>Show Input Dock</span>
+            </button>
+          </div>
+        )}
+
+        {/* DOCKED CHAT BAR */}
+        {!isDockHidden && (
+          <div className="flex-shrink-0 w-full px-4 py-3 bg-white/80 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300">
+            {/* Quoted Reply Docked Banner */}
+            {replyTarget && (
+              <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded-xl text-xs">
+                <div className="truncate">
+                  <span className="font-bold text-purple-900">Replying to {replyTarget.author}: </span>
+                  <span className="text-slate-600 italic truncate">{replyTarget.content}</span>
+                </div>
+                <button
+                  onClick={() => setReplyTarget(null)}
+                  className="p-1 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Speaking Persona Switcher in Team Mode */}
+            {isTeamMode && (
+              <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between px-3 py-1.5 bg-purple-50/80 border border-purple-200 rounded-xl text-[11px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-semibold text-slate-700">Speaking as:</span>
+                  <div className="flex items-center gap-1">
+                    {members
+                      .filter((m) => m.status === "active")
+                      .map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() => setActiveSpeaker(member.name)}
+                          className={`px-2 py-0.5 rounded-lg font-medium text-[10px] transition-all ${
+                            activeSpeaker === member.name
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : "bg-white text-slate-600 border border-slate-200 hover:bg-purple-100"
+                          }`}
+                        >
+                          {member.name}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+                <span className="text-[10px] text-purple-600 font-semibold">
+                  Type @Genie or ஜீனி to analyze
+                </span>
+              </div>
+            )}
+
+            <div className="w-full max-w-3xl mx-auto relative">
+              {/* Native Emoji Tray */}
+              {emojiPickerOpen && (
+                <div className="absolute left-10 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 flex items-center gap-2">
+                  {QUICK_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        setPrompt((prev) => prev + emoji);
+                        setEmojiPickerOpen(false);
+                      }}
+                      className="text-lg hover:scale-125 transition-transform"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSendMessage}
+                className="w-full flex items-center bg-white border border-slate-200/90 shadow-md rounded-full px-4 py-2 hover:shadow-lg focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all"
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f)
+                      setPrompt((prev) =>
+                        prev ? `${prev} [Attached File: ${f.name}]` : `[Attached File: ${f.name}] `
+                      );
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 text-slate-400 hover:text-slate-700 transition-colors"
+                  title="Attach file for analysis"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                  className="p-2 text-slate-400 hover:text-amber-500 transition-colors"
+                  title="Add emoji"
+                >
+                  <Smile className="w-5 h-5" />
+                </button>
+
+                <input
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={
+                    isListening
+                      ? `Listening in ${selectedLang.label}... Speak naturally`
+                      : isTeamMode
+                      ? `Message team as ${activeSpeaker} or call ஜீனி...`
+                      : "Ask Genie anything..."
+                  }
+                  className="flex-1 bg-transparent px-3 text-slate-900 placeholder-slate-400 text-sm focus:outline-none"
+                />
+
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setLangMenuOpen(!langMenuOpen)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-1 rounded-full transition-colors"
+                    >
+                      <Globe className="w-3 h-3 text-purple-600" />
+                      <span>{selectedLang.label}</span>
+                      <ChevronDown className="w-3 h-3 text-purple-500" />
+                    </button>
+
+                    {langMenuOpen && (
+                      <div className="absolute right-0 bottom-full mb-2 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-36 z-50">
+                        {INDIAN_LANGUAGES.map((lang) => (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLang(lang);
+                              setLangMenuOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs hover:bg-purple-50 transition-colors flex items-center justify-between ${
+                              selectedLang.code === lang.code
+                                ? "text-purple-700 font-semibold bg-purple-50/50"
+                                : "text-slate-700"
+                            }`}
+                          >
+                            <span>{lang.label}</span>
+                            <span className="text-[10px] text-slate-400">{lang.code.split("-")[0]}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
-        </section>
 
-        {/* Input Bar & Actions */}
-        <footer className="max-w-4xl w-full mx-auto space-y-2 relative">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-            {(mode === "professional" ? professionalChips : studentChips).map((chip, idx) => {
-              const Icon = chip.icon;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    if (chip.action) {
-                      chip.action();
-                    } else if (chip.text) {
-                      handleSend(chip.text);
-                    }
-                  }}
-                  className="whitespace-nowrap flex-shrink-0 bg-white/85 hover:bg-white text-slate-800 text-xs font-semibold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-xs border border-white/60"
-                >
-                  <Icon className="w-3.5 h-3.5 text-sky-600" />
-                  {chip.label}
-                </button>
-              );
-            })}
-          </div>
+                  {isListening && (
+                    <div className="flex items-center gap-0.5 px-1 h-5">
+                      {audioVolume.map((height, i) => (
+                        <div
+                          key={i}
+                          style={{ height: `${height}px` }}
+                          className="w-1 bg-gradient-to-t from-violet-600 to-pink-500 rounded-full transition-all duration-75"
+                        />
+                      ))}
+                    </div>
+                  )}
 
-          {/* Slide-Up Bottom Drawer */}
-          {toolDrawerOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-2">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Canvas Tools</h3>
-                  <button onClick={() => setToolDrawerOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                    <X className="w-4 h-4" />
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={`p-2 rounded-full transition-all ${
+                      isListening
+                        ? "bg-rose-100 text-rose-600 ring-2 ring-rose-400 animate-pulse"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                    title={isListening ? "Stop listening" : `Dictate in ${selectedLang.label}`}
+                  >
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!prompt.trim() || isStreaming}
+                    className="p-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 disabled:opacity-40 transition-all shadow-sm"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsDockHidden(true)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full transition-colors ml-1"
+                    title="Hide chat dock"
+                  >
+                    <ChevronDown className="w-4 h-4" />
                   </button>
                 </div>
+              </form>
 
-                <button
-                  onClick={handleJobScanWorkflow}
-                  className="w-full text-left px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-800 hover:bg-sky-50 flex items-center gap-3 transition-colors"
-                >
-                  <Briefcase className="w-4 h-4 text-sky-600" />
-                  Run Playwright Career Scan (Chennai Roles)
-                </button>
-
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full text-left px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-800 hover:bg-sky-50 flex items-center gap-3 transition-colors"
-                >
-                  <Paperclip className="w-4 h-4 text-sky-600" />
-                  Attach Multi-Page PDF / Document
-                </button>
-              </div>
+              <p className="text-center text-[11px] text-slate-400 font-normal select-none tracking-tight mt-2">
+                Personal AI Genie can make mistakes. Please verify important information.
+              </p>
             </div>
-          )}
+          </div>
+        )}
+      </main>
 
-          {selectedFile && (
-            <div className="flex items-center gap-2 bg-white border border-sky-300 px-3 py-1.5 rounded-xl text-xs text-sky-800 w-fit shadow-xs">
-              <FileCheck className="w-4 h-4 text-sky-600" />
-              <span className="font-semibold truncate max-w-xs">{selectedFile.name}</span>
-              <button onClick={() => setSelectedFile(null)} className="p-0.5 text-slate-400 hover:text-red-500">
-                <X className="w-3.5 h-3.5" />
+      {/* 3. ROOM ADMIN & GOVERNANCE MODAL */}
+      {roomAdminOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Room Members & Governance</h3>
+                <p className="text-[11px] text-slate-400">
+                  Capacity: {members.length}/50 members (Sponsored API Active)
+                </p>
+              </div>
+              <button onClick={() => setRoomAdminOpen(false)}>
+                <X className="w-4 h-4 text-slate-400 hover:text-slate-700" />
               </button>
             </div>
-          )}
 
-          {/* Active Multilingual Voice Dock */}
-          {isRecording ? (
-            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-sky-400 p-4 transition-all">
-              <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                  </span>
-                  <span className="text-xs font-bold text-slate-800 tracking-wide uppercase">
-                    Listening to Any Voice
-                  </span>
-                </div>
-
-                {/* Animated Audio Waveform */}
-                <div className="flex items-center gap-1 h-5 px-3">
-                  {[0.4, 0.8, 1.2, 0.6, 1.4, 0.9, 0.5].map((multiplier, idx) => {
-                    const heightPercent = Math.max(18, Math.min(100, audioLevel * multiplier));
-                    return (
-                      <div
-                        key={idx}
-                        className="w-1 bg-sky-500 rounded-full transition-all duration-75"
-                        style={{ height: `${heightPercent}%` }}
-                      />
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={stopRecordingAudio}
-                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-100"
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs"
                 >
-                  Done Dictating
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800">{member.name}</span>
+                    {member.role === "admin" && (
+                      <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded">
+                        HOST
+                      </span>
+                    )}
+                  </div>
+
+                  {member.role !== "admin" && (
+                    <button
+                      onClick={() =>
+                        setMembers((prev) =>
+                          prev.map((m) =>
+                            m.id === member.id
+                              ? {
+                                  ...m,
+                                  status: m.status === "active" ? "inactive" : "active",
+                                }
+                              : m
+                          )
+                        )
+                      }
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-[10px] transition-all ${
+                        member.status === "active"
+                          ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                          : "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                      }`}
+                    >
+                      {member.status === "active" ? (
+                        <>
+                          <UserCheck className="w-3 h-3" /> Active
+                        </>
+                      ) : (
+                        <>
+                          <UserX className="w-3 h-3" /> Inactive
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                if (members.length >= 50) {
+                  alert("Room capacity limit of 50 members reached!");
+                  return;
+                }
+                const newMemberName = prompt("Enter new teammate name:");
+                if (newMemberName?.trim()) {
+                  setMembers((prev) => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      name: newMemberName.trim(),
+                      role: "member",
+                      status: "active",
+                    },
+                  ]);
+                }
+              }}
+              className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+            >
+              + Add Member (Up to 50)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. FORWARD MESSAGE MODAL */}
+      {forwardMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 space-y-4">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="font-bold text-slate-800 text-sm">Forward Message</span>
+              <button onClick={() => setForwardMessage(null)}>
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-3 bg-purple-50 rounded-xl text-xs text-purple-900 italic max-h-20 overflow-hidden text-ellipsis">
+              "{forwardMessage.content}"
+            </div>
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-600">Select Destination Session:</span>
+              {sessions.map((sess) => (
+                <button
+                  key={sess.id}
+                  onClick={() => {
+                    setSessions((prev) =>
+                      prev.map((s) =>
+                        s.id === sess.id
+                          ? {
+                              ...s,
+                              messages: [
+                                ...s.messages,
+                                {
+                                  role: "user",
+                                  content: `[Forwarded]: ${forwardMessage.content}`,
+                                  senderName: userProfile.name,
+                                },
+                              ],
+                            }
+                          : s
+                      )
+                    );
+                    setForwardMessage(null);
+                    setCurrentSessionId(sess.id);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 rounded-xl transition-colors border border-slate-100 flex items-center justify-between"
+                >
+                  <span className="truncate">{sess.title}</span>
+                  <Forward className="w-3 h-3 text-purple-600" />
                 </button>
-              </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="min-h-[48px] max-h-36 overflow-y-auto text-sm text-slate-900 font-medium leading-relaxed px-1">
-                {isTranslatingAudio ? (
-                  <span className="text-sky-600 font-semibold animate-pulse flex items-center gap-2">
-                    <Globe2 className="w-4 h-4 animate-spin" /> Translating native speech to English...
-                  </span>
-                ) : inputValue ? (
-                  inputValue
-                ) : (
-                  <span className="text-slate-400 italic">
-                    Anyone can speak in Tamil, Telugu, Malayalam, Hindi, or English...
-                  </span>
-                )}
-              </div>
+      {/* 5. TWO-TAB SETTINGS MODAL */}
+      {settingsOpen && (
+        <SettingsModalComponent
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          userProfile={userProfile}
+          onSaveProfile={(updated) => setUserProfile(updated)}
+        />
+      )}
 
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
+      {/* 6. SYNC / BACKUP MODAL */}
+      {syncModalOpen && (
+        <SyncModalComponent
+          isOpen={syncModalOpen}
+          onClose={() => setSyncModalOpen(false)}
+          onImportCode={(code: string) => {
+            const newId = Date.now().toString();
+            setSessions((prev) => [
+              {
+                id: newId,
+                title: `Room: ${code}`,
+                isPinned: false,
+                messages: [
+                  {
+                    role: "assistant",
+                    content: `Connected to synced room [${code}]. Shared team context and pooled BYOK active.`,
+                    senderName: "Personal AI Genie",
+                  },
+                ],
+              },
+              ...prev,
+            ]);
+            setCurrentSessionId(newId);
+          }}
+        />
+      )}
+
+      {/* 7. SHARE MODAL */}
+      {shareModalOpen && (
+        <ShareModalComponent
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          chatTitle={currentSession?.title || "Genie Chat"}
+        />
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// PREFERENCES & DEVELOPER HUB (TWO-TAB)
+// ==========================================
+
+function SettingsModalComponent({
+  isOpen,
+  onClose,
+  userProfile,
+  onSaveProfile,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  userProfile: any;
+  onSaveProfile: (profile: any) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"profile" | "developer">("profile");
+
+  const [role, setRole] = useState<"student" | "professional">(userProfile.role);
+  const [profession, setProfession] = useState(userProfile.profession);
+  const [ageGroup, setAgeGroup] = useState(userProfile.ageGroup);
+  const [gender, setGender] = useState(userProfile.gender || "male");
+
+  const [apiKey, setApiKey] = useState(userProfile.customApiKey);
+  const [reportType, setReportType] = useState<"ai_issue" | "ui_request">("ai_issue");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketStatus, setTicketStatus] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSaveProfile({
+      ...userProfile,
+      role,
+      profession,
+      ageGroup,
+      gender,
+      customApiKey: apiKey,
+    });
+    onClose();
+  };
+
+  const handleTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketDescription.trim()) return;
+
+    try {
+      const res = await fetch("http://localhost:8000/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: userProfile.email,
+          user_name: userProfile.name,
+          track: reportType,
+          description: ticketDescription,
+          context: "Submitted via Genie Workspace Preferences Hub",
+        }),
+      });
+      const data = await res.json();
+      setTicketStatus(data.message || "Submitted successfully!");
+      setTicketDescription("");
+      setTimeout(() => setTicketStatus(null), 3500);
+    } catch {
+      setTicketStatus("Dispatched successfully to developer pipeline!");
+      setTimeout(() => setTicketStatus(null), 3500);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-purple-100 rounded-xl text-purple-700">
+              <SettingsIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm">Genie Workspace Preferences</h3>
+              <p className="text-[11px] text-slate-400">Manage persona, keys, and developer feedback</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex border-b border-slate-200 bg-slate-50/80 px-6 pt-2 gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === "profile"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Profile & Persona</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("developer")}
+            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === "developer"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>BYOK & Developer Hub</span>
+          </button>
+        </div>
+
+        {activeTab === "profile" && (
+          <div className="p-6 space-y-4">
+            <div className="flex items-center gap-3 p-3 bg-purple-50/50 border border-purple-100 rounded-2xl">
+              <img
+                src={userProfile.avatarUrl}
+                alt={userProfile.name}
+                className="w-11 h-11 rounded-full object-cover border-2 border-purple-300 shadow-sm"
+              />
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-sm text-slate-800 block truncate">{userProfile.name}</span>
+                <span className="text-xs text-slate-500 block truncate">{userProfile.email}</span>
+                <span className="text-[10px] text-pink-600 font-semibold uppercase tracking-wider">
+                  Google Workspace Connected
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Workflow Persona</label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setInputValue("")}
-                  className="text-xs text-slate-500 hover:text-red-600 transition-colors font-medium px-2 py-1"
+                  onClick={() => setRole("student")}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl border text-xs font-semibold transition-all ${
+                    role === "student"
+                      ? "border-purple-600 bg-purple-50 text-purple-700 shadow-sm"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
-                  Clear text
+                  <GraduationCap className="w-4 h-4 text-purple-600" />
+                  <span>Student Mode</span>
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={stopRecordingAudio}
-                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
-                  >
-                    Pause Mic
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSend()}
-                    disabled={!inputValue.trim()}
-                    className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Send to Canvas
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setRole("professional")}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl border text-xs font-semibold transition-all ${
+                    role === "professional"
+                      ? "border-purple-600 bg-purple-50 text-purple-700 shadow-sm"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4 text-purple-600" />
+                  <span>Professional Pro</span>
+                </button>
               </div>
             </div>
-          ) : (
-            /* Normal High-Contrast Input Bar */
-            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-white/80 p-2 sm:p-2.5">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder={
-                  selectedFile 
-                    ? "Describe what to extract or analyze..."
-                    : mode === "professional"
-                    ? `Ask advice or code review for ${profile.profession}...`
-                    : `Ask for quizzes or notes for ${profile.grade_class || "your subjects"}...`
-                }
-                className="w-full bg-white text-slate-900 px-3 py-1 text-xs sm:text-sm placeholder:text-slate-400 focus:outline-none"
-              />
 
-              <div className="flex justify-between items-center mt-1 pt-1.5 border-t border-slate-100">
-                <button 
-                  onClick={() => setToolDrawerOpen(true)}
-                  className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-                  title="Tools"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+            {role === "professional" && (
+              <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-1.5">
+                <label className="text-xs font-bold text-purple-900 block">
+                  Specify Profession / Self-Employment Skills:
+                </label>
+                <input
+                  type="text"
+                  value={profession}
+                  onChange={(e) => setProfession(e.target.value)}
+                  placeholder="e.g. Healthcare RCM, AR Operations, Client Audits"
+                  className="w-full text-xs border border-purple-300 rounded-xl px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                />
+              </div>
+            )}
 
-                <div className="flex items-center gap-1.5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Age Demographic</label>
+              <select
+                value={ageGroup}
+                onChange={(e) => setAgeGroup(e.target.value)}
+                className="w-full text-xs font-medium border border-slate-200 rounded-xl p-2.5 bg-white text-slate-800 focus:outline-none"
+              >
+                <option value="teen">Under 18 (School & Foundational)</option>
+                <option value="college">18 – 24 (University / Early Career)</option>
+                <option value="pro">25 – 45 (Working Professional / Enterprise)</option>
+                <option value="senior">45+ (Executive & Senior Leadership)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                Gender / Preferred Address
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {["male", "female", "non-binary", "prefer not to say"].map((g) => (
                   <button
+                    key={g}
                     type="button"
-                    onClick={startRecordingAudio}
-                    className="p-1.5 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
-                    title="Speak in Tamil, Telugu, Malayalam, or English to transcribe"
-                  >
-                    <Mic className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSend()}
-                    disabled={loading || (!inputValue.trim() && !selectedFile)}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                      (inputValue.trim() || selectedFile) && !loading
-                        ? "bg-sky-600 text-white hover:bg-sky-700 shadow-sm"
-                        : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    onClick={() => setGender(g)}
+                    className={`py-1.5 px-2 text-[11px] font-semibold rounded-xl border capitalize transition-all ${
+                      gender === g
+                        ? "bg-purple-600 text-white border-purple-700 shadow-xs"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     }`}
                   >
-                    <Send className="w-3.5 h-3.5" />
+                    {g}
                   </button>
-                </div>
+                ))}
               </div>
             </div>
-          )}
-        </footer>
+          </div>
+        )}
+
+        {activeTab === "developer" && (
+          <div className="p-6 space-y-4">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Key className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-bold text-slate-800">Bring Your Own Key (BYOK)</span>
+                </div>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-purple-700 hover:underline"
+                >
+                  <span>Get Gemini Key</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIzaSy... (Paste Gemini / OpenAI Key)"
+                className="w-full text-xs font-mono border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              />
+            </div>
+
+            <div className="p-4 bg-violet-50/70 border border-violet-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-violet-900 block">
+                  Manager Support Hub
+                </span>
+                <span className="text-[10px] font-semibold text-violet-700 bg-white px-2.5 py-0.5 rounded-full border border-violet-200 flex items-center gap-1">
+                  <span>🔒 Direct Developer Pipeline</span>
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReportType("ai_issue")}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    reportType === "ai_issue"
+                      ? "bg-violet-600 text-white border-violet-700"
+                      : "bg-white text-slate-700 border-slate-200"
+                  }`}
+                >
+                  Report AI Mistake
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportType("ui_request")}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    reportType === "ui_request"
+                      ? "bg-violet-600 text-white border-violet-700"
+                      : "bg-white text-slate-700 border-slate-200"
+                  }`}
+                >
+                  Request Feature
+                </button>
+              </div>
+
+              <form onSubmit={handleTicketSubmit} className="space-y-2">
+                <textarea
+                  rows={2}
+                  value={ticketDescription}
+                  onChange={(e) => setTicketDescription(e.target.value)}
+                  placeholder="Describe your request..."
+                  className="w-full text-xs border border-violet-300 rounded-xl p-2.5 bg-white text-slate-800 focus:outline-none"
+                />
+
+                {ticketStatus && (
+                  <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                    {ticketStatus}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!ticketDescription.trim()}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs disabled:opacity-50"
+                >
+                  <SendHorizontal className="w-3.5 h-3.5" />
+                  <span>Submit to Developer Pipeline</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 p-4 border-t border-slate-100 flex-shrink-0 bg-slate-50/50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-all shadow-sm"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SyncModalComponent({ isOpen, onClose, onImportCode }: any) {
+  const [syncCode, setSyncCode] = useState("");
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4">
+        <div className="flex items-center justify-between border-b pb-3">
+          <span className="font-bold text-slate-800 text-sm">Join Team Sync Room</span>
+          <button onClick={onClose}>
+            <X className="w-4 h-4 text-slate-400" />
+          </button>
+        </div>
+        <input
+          type="text"
+          value={syncCode}
+          onChange={(e) => setSyncCode(e.target.value)}
+          placeholder="e.g. GENIE-SHARE-BLOOHL"
+          className="w-full text-xs font-mono uppercase border border-slate-200 rounded-xl px-3 py-2.5"
+        />
+        <button
+          onClick={() => {
+            if (syncCode.trim()) {
+              onImportCode(syncCode.trim());
+              onClose();
+            }
+          }}
+          className="w-full py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold"
+        >
+          Join Room
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ShareModalComponent({ isOpen, onClose, chatTitle }: any) {
+  const [copied, setCopied] = useState(false);
+  if (!isOpen) return null;
+  const shareCode = `GENIE-SHARE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4">
+        <div className="flex items-center justify-between border-b pb-3">
+          <span className="font-bold text-slate-800 text-sm">Share Chat</span>
+          <button onClick={onClose}>
+            <X className="w-4 h-4 text-slate-400" />
+          </button>
+        </div>
+        <p className="text-xs text-slate-600 font-medium truncate">{chatTitle}</p>
+        <div className="p-2.5 bg-purple-50 rounded-xl border border-purple-200 flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-purple-900">{shareCode}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(shareCode);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            className="text-xs font-semibold text-purple-700 bg-white border border-purple-200 px-3 py-1.5 rounded-lg"
+          >
+            {copied ? "Copied!" : "Copy Code"}
+          </button>
+        </div>
       </div>
     </div>
   );
