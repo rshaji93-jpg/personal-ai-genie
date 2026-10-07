@@ -162,10 +162,12 @@ const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
+// Confirmed active production models
 const ACTIVE_GEMINI_CASCADES = [
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
   "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
 ];
 
 const ADMIN_EMAILS = ["rshaji93@gmail.com"];
@@ -289,7 +291,7 @@ function MainChatApp() {
   const [dailyUsageCount, setDailyUsageCount] = useState<number>(0);
   const [quotaExceededModalOpen, setQuotaExceededModalOpen] = useState(false);
 
-  const [activeModelName, setActiveModelName] = useState<string>("gemini-2.0-flash");
+  const [activeModelName, setActiveModelName] = useState<string>("gemini-3.8-flash");
 
   const [roomId, setRoomId] = useState(roomQuery);
   const [roomPasscode, setRoomPasscode] = useState("842-109");
@@ -687,7 +689,7 @@ function MainChatApp() {
 ---
 
 ## 1. ACTIVE MULTI-MODEL FALLBACK CASCADE
-- Active Models: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro
+- Active Models: gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-2.0-flash
 - Direct REST architecture prevents SDK deprecation and delivers instant conversational intelligence.
 
 ---
@@ -977,10 +979,11 @@ function MainChatApp() {
     setIsStreaming(true);
 
     let finalReply = "";
-    let finalModel = "gemini-2.0-flash";
+    let finalModel = "gemini-3.8-flash";
 
+    // Accommodate Render's 30-45s cold start delay
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 50000);
 
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -1012,7 +1015,7 @@ function MainChatApp() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       finalReply = data.reply;
-      finalModel = data.model_used || "gemini-2.0-flash";
+      finalModel = data.model_used || "gemini-3.8-flash";
     } catch {
       clearTimeout(timeoutId);
 
