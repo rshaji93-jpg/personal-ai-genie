@@ -14,7 +14,12 @@ export const metadata: Metadata = {
     type: "website",
   },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/icon" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/icon",
+    shortcut: "/icon",
   },
 };
 
@@ -26,7 +31,11 @@ export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <body className="h-[100dvh] w-screen overflow-hidden bg-slate-50 text-slate-900 antialiased">
