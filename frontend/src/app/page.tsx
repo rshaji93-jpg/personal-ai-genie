@@ -1,5 +1,9 @@
 "use client";
 
+// ========================================================================= //
+// SECTION 1: IMPORTS, CONSTANTS & THEME PRESETS                             //
+// ========================================================================= //
+
 import React, { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
@@ -58,6 +62,10 @@ import {
   Maximize2,
   Minimize2,
   FileText,
+  FileUp,
+  BookOpen,
+  CheckSquare,
+  Calculator,
 } from "lucide-react";
 
 interface IndianLanguage {
@@ -261,6 +269,10 @@ function extractCodeBlock(raw: string): { title: string; language: string; code:
   return null;
 }
 
+// ========================================================================= //
+// SECTION 2: AUTHENTICATION, INITIALIZATION & PERSISTED SESSION STORAGE     //
+// ========================================================================= //
+
 function MainChatApp() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -282,7 +294,6 @@ function MainChatApp() {
 
   const [dailyUsageCount, setDailyUsageCount] = useState<number>(0);
   const [quotaExceededModalOpen, setQuotaExceededModalOpen] = useState(false);
-
   const [activeModelName, setActiveModelName] = useState<string>("gemini-2.5-flash");
 
   const [roomId, setRoomId] = useState(roomQuery);
@@ -334,6 +345,7 @@ function MainChatApp() {
   const [forwardMessage, setForwardMessage] = useState<Message | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"profile" | "developer" | "totp" | "theme" | "docs">("profile");
@@ -714,20 +726,20 @@ function MainChatApp() {
   };
 
   const handleDownloadProjectDocumentation = () => {
-    const docs = `# Personal AI Genie — Architecture & User Terms
-**Platform Version:** 4.8.0 Master
+    const docs = `# Personal AI Genie — Comprehensive Architecture & User Disclaimer
+**Platform Version:** 5.0.0 High-Performance
 **Date:** ${new Date().toLocaleDateString()}
 
 ---
 
 ## 1. DUAL PARALLEL MULTI-MODEL CASCADE
-- Fast-fail racing across active Gemini endpoints ensures zero hanging spinners.
-- 18s failover boundary automatically engages client cascade.
+- Fast-fail racing across Google Gemini endpoints ensures rapid conversational intelligence.
+- 8s initial boundary failover guarantees zero hung spinners.
 
 ---
 
-## 2. GOVERNANCE & PRIVACY
-- Free Tier: 20 interactions daily per Google Account.
+## 2. SOVEREIGN GOVERNANCE & PRIVACY
+- Free Tier: 20 free daily messages per Google account.
 - BYOK: Unlimited token execution directly against Google APIs.
 `;
 
@@ -966,7 +978,9 @@ function MainChatApp() {
           />
         )}
 
-        {/* Sidebar */}
+        {/* ========================================================================= //
+        // SECTION 3: SIDEBAR & CONVERSATION HISTORY                                 //
+        // ========================================================================= */}
         <aside
           className={`${
             sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full w-0 lg:w-0"
@@ -1173,9 +1187,10 @@ function MainChatApp() {
           </button>
         )}
 
-        {/* Main Work Area */}
+        {/* ========================================================================= //
+        // SECTION 4: TOP HEADER & WORKSPACE NAVIGATION                              //
+        // ========================================================================= */}
         <main className="flex flex-1 flex-col h-full min-h-0 min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
-          {/* Header */}
           <header className="flex-shrink-0 flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#DDE3EE] bg-white/80 backdrop-blur-md z-10 shadow-xs gap-2">
             <div className="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar pl-10 lg:pl-0">
               <div className={`flex items-center p-0.5 sm:p-1 bg-white rounded-full border ${selectedTheme.borderClass} shadow-xs shrink-0`}>
@@ -1271,9 +1286,10 @@ function MainChatApp() {
             </div>
           </header>
 
-          {/* Messages & Canvas Workspace */}
+          {/* ========================================================================= //
+          // SECTION 5: CHAT THREAD & CODE CANVAS PANELS                               //
+          // ========================================================================= */}
           <div className="flex-1 min-h-0 flex relative overflow-hidden">
-            {/* Chat Thread */}
             <div className={`flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 transition-all ${activeCanvas ? "w-1/2 pr-2" : "w-full"}`}>
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center px-4">
@@ -1406,7 +1422,7 @@ function MainChatApp() {
                               <button
                                 onClick={() => handleHostIntervention(index)}
                                 className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors"
-                                title="Conduct a deep audit of the room conversation history and provide a clean synthesis"
+                                title="Deep review audit"
                               >
                                 <Sparkles className="w-3 h-3 text-amber-600" />
                                 <span>Intervene & Review</span>
@@ -1465,7 +1481,6 @@ function MainChatApp() {
                       <Redo2 className="w-4 h-4" />
                     </button>
 
-                    {/* Export Dropdown */}
                     <div className="relative">
                       <button
                         onClick={() => setExportMenuOpen(!exportMenuOpen)}
@@ -1559,7 +1574,9 @@ function MainChatApp() {
             </div>
           )}
 
-          {/* Permanently Pinned Safe-Area Chat Input Dock */}
+          {/* ========================================================================= //
+          // SECTION 6: CHAT INPUT DOCK & ATTACHMENT CONTROLS                          //
+          // ========================================================================= */}
           {!isDockHidden && (
             <div className="flex-shrink-0 w-full px-2 sm:px-4 py-2 sm:py-3 bg-white/95 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {replyTarget && (
@@ -1618,6 +1635,122 @@ function MainChatApp() {
               </div>
 
               <div className="w-full max-w-3xl mx-auto relative">
+                {/* Clean Professional & Student Focused Attachment Dock */}
+                {attachmentMenuOpen && (
+                  <div className="absolute left-2 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 w-72 text-slate-800 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Productivity & Uploads</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachmentMenuOpen(false)}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      {/* Document Upload */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachmentMenuOpen(false);
+                          fileInputRef.current?.click();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl transition-colors font-medium text-left"
+                      >
+                        <FileUp className="w-4 h-4 text-purple-600 shrink-0" />
+                        <div>
+                          <p className="font-semibold text-slate-800 text-[11px]">Upload Document / Data</p>
+                          <p className="text-[10px] text-slate-400">PDF, Excel, Word, CSV, or Text</p>
+                        </div>
+                      </button>
+
+                      {/* Role Specific Action Boosters */}
+                      {userProfile.role === "student" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrompt("Please summarize these study notes and generate key takeaways:");
+                              setAttachmentMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl transition-colors font-medium text-left"
+                          >
+                            <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-slate-800 text-[11px]">Summarize Study Notes</p>
+                              <p className="text-[10px] text-slate-400">Exam preparation & revision</p>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrompt("Help me debug and explain this code line-by-line:");
+                              setAttachmentMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl transition-colors font-medium text-left"
+                          >
+                            <Code2 className="w-4 h-4 text-sky-600 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-slate-800 text-[11px]">Debug & Explain Code</p>
+                              <p className="text-[10px] text-slate-400">Coding assignment walkthrough</p>
+                            </div>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrompt("Draft an executive email regarding the following discussion points:");
+                              setAttachmentMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl transition-colors font-medium text-left"
+                          >
+                            <Mail className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-slate-800 text-[11px]">Draft Executive Email</p>
+                              <p className="text-[10px] text-slate-400">Client operations communication</p>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrompt("Analyze this operational revenue cycle audit data and highlight discrepancies:");
+                              setAttachmentMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl transition-colors font-medium text-left"
+                          >
+                            <Calculator className="w-4 h-4 text-amber-600 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-slate-800 text-[11px]">Audit Table / Revenue Data</p>
+                              <p className="text-[10px] text-slate-400">Financial discrepancy check</p>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrompt("Synthesize our meeting notes into clear action items and assignees:");
+                              setAttachmentMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2 hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-xl transition-colors font-medium text-left"
+                          >
+                            <CheckSquare className="w-4 h-4 text-teal-600 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-slate-800 text-[11px]">Meeting Minutes & Action Items</p>
+                              <p className="text-[10px] text-slate-400">Team alignment summary</p>
+                            </div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Emoji Bar */}
                 {emojiPickerOpen && (
                   <div className="absolute left-2 sm:left-10 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 sm:p-3 z-50 flex items-center gap-1 sm:gap-2 overflow-x-auto max-w-[95vw]">
@@ -1659,16 +1792,22 @@ function MainChatApp() {
                   />
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-1 sm:p-2 text-slate-400 hover:text-slate-700 transition-colors shrink-0"
-                    title="Attach file for analysis"
+                    onClick={() => {
+                      setAttachmentMenuOpen(!attachmentMenuOpen);
+                      setEmojiPickerOpen(false);
+                    }}
+                    className="p-1 sm:p-2 text-slate-400 hover:text-purple-600 transition-colors shrink-0"
+                    title="Productivity Boosters & File Upload"
                   >
                     <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                    onClick={() => {
+                      setEmojiPickerOpen(!emojiPickerOpen);
+                      setAttachmentMenuOpen(false);
+                    }}
                     className="p-1 sm:p-2 text-slate-400 hover:text-amber-500 transition-colors shrink-0"
                     title="Add quick emoji reaction"
                   >
@@ -1761,7 +1900,7 @@ function MainChatApp() {
                         className="p-1.5 sm:p-2 bg-gradient-to-r from-violet-600 via-pink-500 via-amber-400 to-emerald-400 text-white rounded-full hover:scale-105 transition-all shadow-xs animate-pulse shrink-0"
                         title="Rainbow Send: Prompt Genie to observe and respond immediately"
                       >
-                        <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <Sparkles className="w-3.5 h-3.5" />
                       </button>
                     )}
 
@@ -1795,7 +1934,9 @@ function MainChatApp() {
         </main>
       </div>
 
-      {/* Complete Legal Terms Modal */}
+      {/* ========================================================================= //
+      // SECTION 7: MODALS & OVERLAYS (SETTINGS, BYOK, TOTP, GOVERNANCE, LEGAL)    //
+      // ========================================================================= */}
       {legalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
           <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1863,7 +2004,6 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Passcode Invalidation Warning Modal */}
       {confirmRegenerateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
@@ -1898,7 +2038,6 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Daily Free Quota Exceeded Modal */}
       {quotaExceededModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
@@ -1949,7 +2088,6 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Room Members & Governance Modal */}
       {roomAdminOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1976,7 +2114,7 @@ function MainChatApp() {
                     <button
                       onClick={() => setConfirmRegenerateModalOpen(true)}
                       className={`p-1 hover:${selectedTheme.textClass} text-slate-400`}
-                      title="Regenerate Passcode (Terminates previous code)"
+                      title="Regenerate Passcode"
                     >
                       <RefreshCw className="w-3 h-3" />
                     </button>
@@ -2154,7 +2292,6 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Share Modal */}
       {shareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4">
@@ -2166,7 +2303,7 @@ function MainChatApp() {
             </div>
             <p className="text-xs text-slate-600 font-medium truncate">{currentSession?.title}</p>
             <p className="text-[11px] text-slate-500">
-              Anyone with this link can hop into this conversation like a group chat and talk with Genie (up to 20 free chats/day without a passcode or key).
+              Anyone with this link can hop into this conversation like a group chat and talk with Genie.
             </p>
             <div className={`p-3 ${selectedTheme.bgLightClass} rounded-xl border ${selectedTheme.borderClass} flex items-center justify-between`}>
               <span className={`text-xs font-mono font-bold ${selectedTheme.textClass}`}>
@@ -2188,7 +2325,6 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Preferences & Settings Modal */}
       {settingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
@@ -2276,7 +2412,6 @@ function MainChatApp() {
               </button>
             </div>
 
-            {/* Profile Tab */}
             {settingsTab === "profile" && (
               <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
                 <div className={`flex items-center justify-between p-3 ${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} rounded-2xl`}>
@@ -2376,7 +2511,6 @@ function MainChatApp() {
               </div>
             )}
 
-            {/* Theme Tab */}
             {settingsTab === "theme" && (
               <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
                 <div>
@@ -2411,7 +2545,6 @@ function MainChatApp() {
               </div>
             )}
 
-            {/* BYOK Developer Hub */}
             {settingsTab === "developer" && (
               <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
@@ -2443,7 +2576,6 @@ function MainChatApp() {
                   </p>
                 </div>
 
-                {/* Direct Developer Pipeline */}
                 <div className="p-4 bg-violet-50/70 border border-violet-200 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -2512,7 +2644,6 @@ function MainChatApp() {
               </div>
             )}
 
-            {/* Authenticator Hub */}
             {settingsTab === "totp" && (
               <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
                 <div className={`p-4 ${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} rounded-2xl space-y-3`}>
@@ -2565,7 +2696,6 @@ function MainChatApp() {
               </div>
             )}
 
-            {/* Docs & Legal Tab */}
             {settingsTab === "docs" && (
               <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
                 <div className="flex items-center justify-between">
@@ -2618,8 +2748,8 @@ function MainChatApp() {
   );
 
   // ========================================================================= //
-  // /// === GENIE CORE ENGINE & EXECUTION LAYER (BOTTOM SECTION) === ///       //
-  // (Future AI/API updates only need to replace this single bottom block)      //
+  // SECTION 8: AI CORE ENGINE & HIGH-SPEED PARALLEL EXECUTION                 //
+  // (Future AI updates only need to replace this single bottom block)         //
   // ========================================================================= //
 
   function checkWakeWordTrigger(text: string): boolean {
@@ -2636,7 +2766,7 @@ function MainChatApp() {
     return triggers.some((t) => lower.includes(t.toLowerCase()) || text.includes(t));
   }
 
-  // Fast Parallel Client-Side Gemini Engine: Races 3 endpoints concurrently
+  // High-Speed Parallel Race: Dispatches to 3 models simultaneously; fastest wins
   async function callActiveGeminiCascade(
     userPrompt: string,
     history: Message[],
@@ -2665,17 +2795,17 @@ function MainChatApp() {
     const systemInstruction = {
       parts: [
         {
-          text: `You are Personal AI Genie, an authentic, highly intelligent conversational companion. Respond naturally, helpfully, and promptly in ${selectedLang.label}. Keep responses rich, accurate, and direct.`,
+          text: `You are Personal AI Genie, an authentic, highly intelligent conversational companion and workspace collaborator. Answer thoroughly, naturally, and intelligently in ${selectedLang.label}. Keep formatting clean.`,
         },
       ],
     };
 
-    // Parallel endpoint race with strict 9-second timeout per candidate
+    // Parallel fast-race models
     const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
-    const requestPromises = candidateModels.map(async (modelName) => {
+    const fetchPromises = candidateModels.map(async (modelName) => {
       const abortCtrl = new AbortController();
-      const timer = setTimeout(() => abortCtrl.abort(), 9000);
+      const timer = setTimeout(() => abortCtrl.abort(), 7000); // 7s cutoff per model
       try {
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
@@ -2696,9 +2826,9 @@ function MainChatApp() {
         clearTimeout(timer);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && text.trim()) {
-          return { text: text.trim(), model: modelName };
+        const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidateText && candidateText.trim().length > 0) {
+          return { text: candidateText.trim(), model: modelName };
         }
         throw new Error("Empty candidate output");
       } catch (err) {
@@ -2707,7 +2837,7 @@ function MainChatApp() {
       }
     });
 
-    return await Promise.any(requestPromises);
+    return await Promise.any(fetchPromises);
   }
 
   async function handleHostIntervention(faultyAiIndex: number) {
@@ -2812,6 +2942,7 @@ function MainChatApp() {
     setPrompt("");
     setReplyTarget(null);
     setEmojiPickerOpen(false);
+    setAttachmentMenuOpen(false);
 
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
@@ -2861,9 +2992,9 @@ function MainChatApp() {
     let finalReply = "";
     let finalModel = "gemini-2.5-flash";
 
-    // 18-second maximum budget for the backend before immediate fallback
+    // Fast 8-second boundary for Render backend before immediate parallel client race
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 18000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -2912,7 +3043,7 @@ function MainChatApp() {
         if (selectedLang.code === "ta-IN") {
           finalReply = `வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. உங்கள் கேள்விக்கு பதில் அளிக்க தயாராக உள்ளேன். தயவுசெய்து உங்கள் Gemini API Key-ஐ Settings > BYOK-இல் சரிபார்க்கவும்.`;
         } else {
-          finalReply = `I am reviewing your request regarding "${actualText}". For real-time responses, verify your Gemini API key under Preferences > BYOK.`;
+          finalReply = `I am reviewing your request regarding "${actualText}". For uninterrupted connectivity, please verify your Gemini API key under Preferences > BYOK.`;
         }
       }
     } finally {
@@ -2942,8 +3073,7 @@ function MainChatApp() {
       if (extracted) {
         setActiveCanvas(extracted);
       }
-      // Guaranteed spinner termination
-      setIsStreaming(false);
+      setIsStreaming(false); // Spinner is unconditionally terminated
     }
   }
 }
