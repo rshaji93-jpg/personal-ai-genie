@@ -1,37 +1,20 @@
-import { MetadataRoute } from "next";
+import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Personal AI Canvas",
-    short_name: "AICanvas",
-    description: "Private circle AI assistant and study architect",
+    name: "Personal AI Genie",
+    short_name: "Genie",
+    description: "Autonomous Multi-User Workspace & Personal AI Companion",
     start_url: "/",
     display: "standalone",
-    background_color: "#7ec5f9",
-    theme_color: "#0284c7",
+    background_color: "#ffffff",
+    theme_color: "#7c3aed",
     icons: [
       {
-        src: "/icon-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        src: "/icon-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
+        src: "/favicon.ico",
+        sizes: "any",
+        type: "image/x-icon",
       },
     ],
-  };
-}import { MetadataRoute } from "next";
-
-export default function manifest(): MetadataRoute.Manifest {
-  return {
-    name: "Personal AI Canvas",
-    short_name: "AICanvas",
-    description: "Private circle AI assistant",
-    start_url: "/",
-    display: "standalone",
-    background_color: "#7ec5f9",
-    theme_color: "#0284c7",
   };
 }
