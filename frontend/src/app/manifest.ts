@@ -22,4 +22,16 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
   };
+}import { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Personal AI Canvas",
+    short_name: "AICanvas",
+    description: "Private circle AI assistant",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#7ec5f9",
+    theme_color: "#0284c7",
+  };
 }
