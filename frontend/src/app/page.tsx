@@ -360,7 +360,7 @@ function MainChatApp() {
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://personal-ai-genie-backend.onrender.com";
   const GOOGLE_CLIENT_ID =
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-    "767453349146-ap1utn3gjlgd59ur6f6on4fd9l9g6u2o.apps.googleusercontent.com";
+    "767453349146-honr4mjea5jgv23andq145fqtcjdor0t.apps.googleusercontent.com";
 
   const isCorporateDomain =
     Boolean(userProfile.email) &&
