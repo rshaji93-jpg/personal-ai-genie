@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Personal AI Genie",
   description: "Autonomous Multi-User Workspace & Personal AI Companion",
   metadataBase: new URL("https://personal-ai-canvas.vercel.app"),
+  manifest: "/manifest.json",
   openGraph: {
     title: "Personal AI Genie",
     description: "Autonomous Multi-User Workspace & Personal AI Companion",
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
       { url: "/icon.svg", type: "image/svg+xml" }
     ],
     shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    apple: "/icon-512.png",
   },
 };
 
@@ -36,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="h-[100dvh] w-screen overflow-hidden bg-slate-50 text-slate-900 antialiased">
+    <html lang="en" className="h-full">
+      <body className="h-full min-h-[100dvh] w-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
         {children}
       </body>
     </html>

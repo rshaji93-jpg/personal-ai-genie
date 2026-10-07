@@ -162,7 +162,6 @@ const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
-// Confirmed active production models
 const ACTIVE_GEMINI_CASCADES = [
   "gemini-3.8-flash",
   "gemini-3.7-flash",
@@ -431,7 +430,6 @@ function MainChatApp() {
     }
   }, [isAuthenticated, userProfile, isKeyOwner, isDevUser]);
 
-  // Google OAuth Initializer Guarded Strictly
   useEffect(() => {
     if (!mounted || !GOOGLE_CLIENT_ID) return;
 
@@ -764,7 +762,6 @@ function MainChatApp() {
     return triggers.some((t) => lower.includes(t.toLowerCase()) || text.includes(t));
   };
 
-  // Direct Client-Side Active Gemini Cascade Caller
   const callActiveGeminiCascade = async (
     userPrompt: string,
     history: Message[],
@@ -984,7 +981,6 @@ function MainChatApp() {
     let finalReply = "";
     let finalModel = "gemini-3.8-flash";
 
-    // Accommodate Render's 30-45s cold start delay
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 50000);
 
@@ -1022,7 +1018,6 @@ function MainChatApp() {
     } catch {
       clearTimeout(timeoutId);
 
-      // Client-Side Active Gemini Cascade fallback
       try {
         const cascadeResult = await callActiveGeminiCascade(
           actualText,
@@ -1114,7 +1109,7 @@ function MainChatApp() {
     <>
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
 
-      {/* Primary Authentication Gate with Pre-Login Terms & Disclaimer Agreement */}
+      {/* Primary Authentication Gate */}
       {!isAuthenticated && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 flex flex-col items-center text-center space-y-4">
@@ -1129,7 +1124,6 @@ function MainChatApp() {
               </p>
             </div>
 
-            {/* Pre-Login Legal Disclaimer Box */}
             <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-left space-y-2">
               <div className="flex items-center gap-1.5 text-slate-800 text-xs font-bold">
                 <ShieldCheck className="w-4 h-4 text-purple-600" />
@@ -1171,7 +1165,6 @@ function MainChatApp() {
               )}
             </div>
 
-            {/* Google Sign In Button Container */}
             <div
               className={`flex justify-center w-full min-h-[40px] transition-opacity ${
                 hasAgreedToTerms ? "opacity-100" : "opacity-40 pointer-events-none"
@@ -1189,7 +1182,7 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Room Security Passcode Gate with X Close & Exit Button */}
+      {/* Room Security Passcode Gate */}
       {isAuthenticated && isTeamMode && !isRoomUnlocked && !isKeyOwner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4">
           <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 flex flex-col items-center text-center space-y-4 relative">
@@ -1249,8 +1242,8 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Main Layout */}
-      <div className="flex h-screen w-full overflow-hidden bg-[#F0F2F6] text-slate-800 antialiased font-sans">
+      {/* Main Responsive Layout Wrapper */}
+      <div className="flex h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-[#F0F2F6] text-slate-800 antialiased font-sans">
         {/* Mobile Backdrop Overlay */}
         {sidebarOpen && (
           <div
@@ -1467,8 +1460,8 @@ function MainChatApp() {
         )}
 
         {/* Main Work Area */}
-        <main className="flex flex-1 flex-col h-full min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
-          {/* Responsive Header */}
+        <main className="flex flex-1 flex-col h-full min-h-0 min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
+          {/* Header */}
           <header className="flex-shrink-0 flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#DDE3EE] bg-white/80 backdrop-blur-md z-10 shadow-xs gap-2">
             <div className="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar pl-10 lg:pl-0">
               <div className={`flex items-center p-0.5 sm:p-1 bg-white rounded-full border ${selectedTheme.borderClass} shadow-xs shrink-0`}>
@@ -1570,12 +1563,8 @@ function MainChatApp() {
             <div className={`flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 transition-all ${activeCanvas ? "w-1/2 pr-2" : "w-full"}`}>
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white shadow-md border border-[#DCE2ED] p-0.5 mb-4">
-                    <GenieAvatar
-                      src={userProfile.avatarUrl}
-                      alt="Genie"
-                      className="w-full h-full rounded-full"
-                    />
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-tr from-violet-600 via-pink-500 to-amber-400 text-white shadow-lg p-3.5 mb-4 select-none">
+                    <Sparkles className="w-full h-full text-white drop-shadow-md animate-pulse" />
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900 mb-2">
                     Where should we start?
@@ -1856,9 +1845,9 @@ function MainChatApp() {
             </div>
           )}
 
-          {/* Collapsible Chat Input Dock with Disclaimers & Quota Controls */}
+          {/* Permanently Pinned Safe-Area Chat Input Dock */}
           {!isDockHidden && (
-            <div className="flex-shrink-0 w-full px-2 sm:px-4 py-2 sm:py-3 bg-white/80 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300">
+            <div className="flex-shrink-0 w-full px-2 sm:px-4 py-2 sm:py-3 bg-white/95 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {replyTarget && (
                 <div className={`max-w-3xl mx-auto mb-2 flex items-center justify-between p-2 ${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} rounded-xl text-xs`}>
                   <div className="truncate">
@@ -1871,7 +1860,7 @@ function MainChatApp() {
                 </div>
               )}
 
-              {/* Status Header: Team Mode or 20 Daily Free Quota Pill */}
+              {/* Status Header */}
               <div className="max-w-3xl mx-auto mb-1.5 sm:mb-2 flex items-center justify-between px-2.5 sm:px-3 py-1 bg-slate-50/90 border border-slate-200 rounded-xl text-[10px] sm:text-[11px]">
                 {isTeamMode ? (
                   <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1915,7 +1904,7 @@ function MainChatApp() {
               </div>
 
               <div className="w-full max-w-3xl mx-auto relative">
-                {/* Emoji Bar with Tooltips */}
+                {/* Emoji Bar */}
                 {emojiPickerOpen && (
                   <div className="absolute left-2 sm:left-10 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 sm:p-3 z-50 flex items-center gap-1 sm:gap-2 overflow-x-auto max-w-[95vw]">
                     {QUICK_EMOJIS.map((emoji) => (
@@ -2039,7 +2028,7 @@ function MainChatApp() {
                       {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </button>
 
-                    {/* Standard Send Button */}
+                    {/* Standard Send */}
                     <button
                       type="submit"
                       disabled={!prompt.trim() || isStreaming || (isQuotaEnforced && remainingDailyChats === 0)}
@@ -2049,7 +2038,7 @@ function MainChatApp() {
                       <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
 
-                    {/* Rainbow Send Button */}
+                    {/* Rainbow Send */}
                     {isTeamMode && (
                       <button
                         type="button"
@@ -2062,7 +2051,6 @@ function MainChatApp() {
                       </button>
                     )}
 
-                    {/* Chat Box Hiding Button */}
                     <button
                       type="button"
                       onClick={() => setIsDockHidden(true)}
@@ -2074,7 +2062,7 @@ function MainChatApp() {
                   </div>
                 </form>
 
-                {/* Visible User Disclaimer & Terms Notification */}
+                {/* Visible User Disclaimer */}
                 <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-1.5 sm:mt-2 select-none text-[10px] sm:text-[11px] text-slate-400">
                   <p className="truncate">
                     Personal AI Genie can make mistakes.
@@ -2093,7 +2081,7 @@ function MainChatApp() {
         </main>
       </div>
 
-      {/* Complete Legal Terms, Disclaimer & Privacy Policy Modal */}
+      {/* Complete Legal Terms Modal */}
       {legalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
           <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -2247,7 +2235,7 @@ function MainChatApp() {
         </div>
       )}
 
-      {/* Room Members & Governance Modal with Direct Meeting Dispatcher */}
+      {/* Room Members & Governance Modal */}
       {roomAdminOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -2263,7 +2251,6 @@ function MainChatApp() {
               </button>
             </div>
 
-            {/* Room Security Passcode & Share Controls */}
             <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Room Security Passcode</span>
@@ -2296,7 +2283,6 @@ function MainChatApp() {
               </div>
             </div>
 
-            {/* Direct Meeting Invite Dispatcher */}
             <form onSubmit={handleSendDirectInvites} className={`${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} rounded-2xl p-3.5 space-y-2.5`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -2362,7 +2348,6 @@ function MainChatApp() {
               </div>
             </form>
 
-            {/* Member Management Roster */}
             <div className="space-y-2">
               <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
                 Active Member Roster
