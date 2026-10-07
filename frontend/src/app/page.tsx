@@ -162,13 +162,6 @@ const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
-const ACTIVE_GEMINI_CASCADES = [
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
-  "gemini-2.0-flash",
-];
-
 const ADMIN_EMAILS = ["rshaji93@gmail.com"];
 const VIP_ALLOWED_EMAILS = ["rshaji93@gmail.com", "manoharlumina@gmail.com", "ratnaraja007@gmail.com"];
 const DEVELOPER_EMAIL = "ratnaraja007@gmail.com";
@@ -290,7 +283,7 @@ function MainChatApp() {
   const [dailyUsageCount, setDailyUsageCount] = useState<number>(0);
   const [quotaExceededModalOpen, setQuotaExceededModalOpen] = useState(false);
 
-  const [activeModelName, setActiveModelName] = useState<string>("gemini-3.8-flash");
+  const [activeModelName, setActiveModelName] = useState<string>("gemini-2.5-flash");
 
   const [roomId, setRoomId] = useState(roomQuery);
   const [roomPasscode, setRoomPasscode] = useState("842-109");
@@ -448,7 +441,7 @@ function MainChatApp() {
     }
   }, [isAuthenticated, userProfile, isKeyOwner, isDevUser]);
 
-  // Google OAuth Initializer with persistent session caching
+  // Google OAuth Initializer
   useEffect(() => {
     if (!mounted || !GOOGLE_CLIENT_ID) return;
 
@@ -721,22 +714,21 @@ function MainChatApp() {
   };
 
   const handleDownloadProjectDocumentation = () => {
-    const docs = `# Personal AI Genie — Comprehensive Architecture & User Disclaimer
-**Platform Version:** 4.7.0 Production Master
+    const docs = `# Personal AI Genie — Architecture & User Terms
+**Platform Version:** 4.8.0 Master
 **Date:** ${new Date().toLocaleDateString()}
 
 ---
 
-## 1. ACTIVE MULTI-MODEL FALLBACK CASCADE
-- Active Models: gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-2.0-flash
-- Direct REST architecture prevents SDK deprecation and delivers instant conversational intelligence.
+## 1. DUAL PARALLEL MULTI-MODEL CASCADE
+- Fast-fail racing across active Gemini endpoints ensures zero hanging spinners.
+- 18s failover boundary automatically engages client cascade.
 
 ---
 
-## 2. SOVEREIGN GOVERNANCE & PRIVACY
-- Model A: 10 VIP slots authorized strictly through RFC 6238 TOTP.
-- Model B: Corporate domain detection with department-level Authenticator tokens.
-- Free Tier: Twenty (20) free daily messages per Google account.
+## 2. GOVERNANCE & PRIVACY
+- Free Tier: 20 interactions daily per Google Account.
+- BYOK: Unlimited token execution directly against Google APIs.
 `;
 
     const blob = new Blob([docs], { type: "text/markdown;charset=utf-8" });
@@ -783,322 +775,6 @@ function MainChatApp() {
       recognition.start();
     } catch {
       setIsListening(false);
-    }
-  };
-
-  const checkWakeWordTrigger = (text: string): boolean => {
-    const lower = text.toLowerCase();
-    const triggers = [
-      "@genie", "genie", "jini", "jeeni",
-      "ஜீனி", "ஜீனியே", "கரெக்டா",
-      "जीनी", "हे जीनी", "बताओ जीनी", "suno genie",
-      "జీనీ", "చెప్పు జీనీ",
-      "ജീനി", "പറയൂ ജീനി",
-      "ಜೀನಿ", "ಹೇಳು ಜೀನಿ",
-      "জিনি", "বলো জিনি",
-    ];
-    return triggers.some((t) => lower.includes(t.toLowerCase()) || text.includes(t));
-  };
-
-  const callActiveGeminiCascade = async (
-    userPrompt: string,
-    history: Message[],
-    providedKey?: string
-  ): Promise<{ text: string; model: string }> => {
-    const apiKey =
-      providedKey ||
-      userProfile.customApiKey ||
-      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-      "";
-
-    if (!apiKey) {
-      throw new Error("No Gemini API key available");
-    }
-
-    const contents = history.slice(-6).map((msg) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    }));
-
-    contents.push({
-      role: "user",
-      parts: [{ text: userPrompt }],
-    });
-
-    const systemInstruction = {
-      parts: [
-        {
-          text: `You are Personal AI Genie, an authentic, highly intelligent conversational companion and workspace collaborator. Answer questions naturally, thoroughly, and intelligently just like Google Gemini. When answering science, coding, or general questions, provide rich, helpful explanations. Respect user language: ${selectedLang.label}.`,
-        },
-      ],
-    };
-
-    for (const modelName of ACTIVE_GEMINI_CASCADES) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents,
-              systemInstruction,
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 2048,
-              },
-            }),
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidateText && candidateText.trim().length > 0) {
-            return { text: candidateText, model: modelName };
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    throw new Error("All active Gemini fallback models exhausted");
-  };
-
-  const handleHostIntervention = async (faultyAiIndex: number) => {
-    if (isStreaming) return;
-    setIsStreaming(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_email: userProfile.email,
-          prompt: "Conduct a master audit and intervention on the discussion so far. Review all attendee comments, resolve inconsistencies, and provide a clear, definitive synthesis.",
-          space_mode: spaceMode,
-          conversation_history: messages,
-          is_intervention_audit: true,
-          provider: "gemini",
-          models_cascade: ACTIVE_GEMINI_CASCADES,
-          custom_api_key: userProfile.customApiKey || undefined,
-          language_code: selectedLang.code,
-          is_team_chat: true,
-        }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const rawText = data.reply;
-      const extracted = extractCodeBlock(rawText);
-      const sanitized = sanitizeGenieOutput(rawText);
-
-      const interventionMsg: Message = {
-        role: "assistant",
-        content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
-        senderName: "Personal AI Genie (Master Synthesis)",
-        isIntervention: true,
-        extractedCode: extracted || undefined,
-      };
-
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === currentSessionId ? { ...s, messages: [...s.messages, interventionMsg] } : s
-        )
-      );
-
-      if (extracted) {
-        setActiveCanvas(extracted);
-      }
-    } catch {
-      try {
-        const cascadeResult = await callActiveGeminiCascade(
-          "Conduct a master synthesis on the discussion so far, resolving conflicts with clear next steps.",
-          messages
-        );
-        const extracted = extractCodeBlock(cascadeResult.text);
-        const sanitized = sanitizeGenieOutput(cascadeResult.text);
-
-        const interventionMsg: Message = {
-          role: "assistant",
-          content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
-          senderName: `Personal AI Genie (${cascadeResult.model})`,
-          isIntervention: true,
-          extractedCode: extracted || undefined,
-        };
-
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId ? { ...s, messages: [...s.messages, interventionMsg] } : s
-          )
-        );
-
-        if (extracted) setActiveCanvas(extracted);
-      } catch {
-        const fallbackMsg: Message = {
-          role: "assistant",
-          content: `[★ Verified Synthesis]\n\nAfter reviewing the team discussion history, all attendee requirements have been compiled into a unified roadmap.`,
-          senderName: "Personal AI Genie",
-          isIntervention: true,
-        };
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId ? { ...s, messages: [...s.messages, fallbackMsg] } : s
-          )
-        );
-      }
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
-  const handleSendMessage = async (e?: React.FormEvent, forceRainbowTrigger = false, customText?: string) => {
-    if (e) e.preventDefault();
-    const textToSend = customText !== undefined ? customText : prompt;
-    if (!textToSend.trim() && !forceRainbowTrigger) return;
-    if (isStreaming) return;
-
-    if (isQuotaEnforced && dailyUsageCount >= DAILY_FREE_LIMIT) {
-      setQuotaExceededModalOpen(true);
-      return;
-    }
-
-    const actualText = textToSend.trim() || (forceRainbowTrigger ? "Genie, please analyze the conversation and assist." : "");
-    const sentReplyTarget = replyTarget;
-
-    setPrompt("");
-    setReplyTarget(null);
-    setEmojiPickerOpen(false);
-
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-
-    const userMsg: Message = {
-      role: "user",
-      content: actualText,
-      senderName: isTeamMode ? userProfile.name : undefined,
-      senderEmail: isTeamMode ? userProfile.email : undefined,
-      replyTo: sentReplyTarget || undefined,
-      triggeredByRainbow: forceRainbowTrigger,
-    };
-
-    const updatedMessages = [...messages, userMsg];
-
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === currentSessionId) {
-          const updatedTitle = s.messages.length === 0 ? actualText.slice(0, 24) : s.title;
-          return { ...s, title: updatedTitle, messages: updatedMessages };
-        }
-        return s;
-      })
-    );
-
-    if (isQuotaEnforced) {
-      const newCount = dailyUsageCount + 1;
-      setDailyUsageCount(newCount);
-      if (userProfile.email && typeof window !== "undefined") {
-        const today = new Date().toISOString().split("T")[0];
-        localStorage.setItem(`genie_quota_${userProfile.email}_${today}`, newCount.toString());
-      }
-    }
-
-    const shouldWakeGenie =
-      !isTeamMode ||
-      forceRainbowTrigger ||
-      isObserverActive ||
-      checkWakeWordTrigger(actualText);
-
-    if (!shouldWakeGenie) return;
-
-    setIsStreaming(true);
-
-    let finalReply = "";
-    let finalModel = "gemini-3.8-flash";
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 50000);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_email: userProfile.email,
-          prompt: actualText,
-          space_mode: spaceMode,
-          conversation_history: updatedMessages,
-          provider: "gemini",
-          models_cascade: ACTIVE_GEMINI_CASCADES,
-          custom_api_key: userProfile.customApiKey || undefined,
-          profession_context:
-            userProfile.role === "professional" ? userProfile.profession : undefined,
-          gender_context: userProfile.gender,
-          language_code: selectedLang.code,
-          is_team_chat: isTeamMode,
-          is_observer_active: isObserverActive,
-          quoted_message: sentReplyTarget
-            ? { author: sentReplyTarget.author, content: sentReplyTarget.content }
-            : undefined,
-        }),
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      finalReply = data.reply;
-      finalModel = data.model_used || "gemini-3.8-flash";
-    } catch {
-      clearTimeout(timeoutId);
-
-      try {
-        const cascadeResult = await callActiveGeminiCascade(
-          actualText,
-          updatedMessages
-        );
-        finalReply = cascadeResult.text;
-        finalModel = cascadeResult.model;
-        setActiveModelName(cascadeResult.model);
-      } catch {
-        if (selectedLang.code === "ta-IN") {
-          finalReply = `வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. "${actualText}" குறித்த தகவல்களை திரட்டுகிறேன். தயவுசெய்து உங்கள் Gemini API Key-ஐ Settings-இல் சரிபார்க்கவும்.`;
-        } else {
-          finalReply = `I am reviewing your request regarding "${actualText}". To ensure uninterrupted real-time connectivity, please verify that your Gemini API key is configured under Preferences > BYOK.`;
-        }
-      }
-    } finally {
-      const extracted = extractCodeBlock(finalReply);
-      const sanitized = sanitizeGenieOutput(finalReply);
-
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === currentSessionId
-            ? {
-                ...s,
-                messages: [
-                  ...s.messages,
-                  {
-                    role: "assistant",
-                    content: sanitized,
-                    senderName: `Personal AI Genie`,
-                    modelUsed: finalModel,
-                    extractedCode: extracted || undefined,
-                  },
-                ],
-              }
-            : s
-        )
-      );
-
-      if (extracted) {
-        setActiveCanvas(extracted);
-      }
-      setIsStreaming(false);
     }
   };
 
@@ -2940,6 +2616,336 @@ function MainChatApp() {
       )}
     </>
   );
+
+  // ========================================================================= //
+  // /// === GENIE CORE ENGINE & EXECUTION LAYER (BOTTOM SECTION) === ///       //
+  // (Future AI/API updates only need to replace this single bottom block)      //
+  // ========================================================================= //
+
+  function checkWakeWordTrigger(text: string): boolean {
+    const lower = text.toLowerCase();
+    const triggers = [
+      "@genie", "genie", "jini", "jeeni",
+      "ஜீனி", "ஜீனியே", "கரெக்டா",
+      "जीनी", "हे जीनी", "बताओ जीनी", "suno genie",
+      "జీనీ", "చెప్పు జీనీ",
+      "ജീനി", "പറയൂ ജീനി",
+      "ಜೀನಿ", "ಹೇಳು ಜೀನಿ",
+      "জিনি", "বলো জিনি",
+    ];
+    return triggers.some((t) => lower.includes(t.toLowerCase()) || text.includes(t));
+  }
+
+  // Fast Parallel Client-Side Gemini Engine: Races 3 endpoints concurrently
+  async function callActiveGeminiCascade(
+    userPrompt: string,
+    history: Message[],
+    providedKey?: string
+  ): Promise<{ text: string; model: string }> {
+    const apiKey =
+      providedKey ||
+      userProfile.customApiKey ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+      "";
+
+    if (!apiKey) {
+      throw new Error("No Gemini API key available");
+    }
+
+    const contents = history.slice(-4).map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
+
+    contents.push({
+      role: "user",
+      parts: [{ text: userPrompt }],
+    });
+
+    const systemInstruction = {
+      parts: [
+        {
+          text: `You are Personal AI Genie, an authentic, highly intelligent conversational companion. Respond naturally, helpfully, and promptly in ${selectedLang.label}. Keep responses rich, accurate, and direct.`,
+        },
+      ],
+    };
+
+    // Parallel endpoint race with strict 9-second timeout per candidate
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+
+    const requestPromises = candidateModels.map(async (modelName) => {
+      const abortCtrl = new AbortController();
+      const timer = setTimeout(() => abortCtrl.abort(), 9000);
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            signal: abortCtrl.signal,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents,
+              systemInstruction,
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 1024,
+              },
+            }),
+          }
+        );
+        clearTimeout(timer);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text && text.trim()) {
+          return { text: text.trim(), model: modelName };
+        }
+        throw new Error("Empty candidate output");
+      } catch (err) {
+        clearTimeout(timer);
+        throw err;
+      }
+    });
+
+    return await Promise.any(requestPromises);
+  }
+
+  async function handleHostIntervention(faultyAiIndex: number) {
+    if (isStreaming) return;
+    setIsStreaming(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: userProfile.email,
+          prompt: "Conduct a master audit and intervention on the discussion so far. Review all attendee comments, resolve inconsistencies, and provide a clear, definitive synthesis.",
+          space_mode: spaceMode,
+          conversation_history: messages,
+          is_intervention_audit: true,
+          provider: "gemini",
+          models_cascade: ["gemini-2.5-flash", "gemini-2.0-flash"],
+          custom_api_key: userProfile.customApiKey || undefined,
+          language_code: selectedLang.code,
+          is_team_chat: true,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rawText = data.reply;
+      const extracted = extractCodeBlock(rawText);
+      const sanitized = sanitizeGenieOutput(rawText);
+
+      const interventionMsg: Message = {
+        role: "assistant",
+        content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
+        senderName: "Personal AI Genie (Master Synthesis)",
+        isIntervention: true,
+        extractedCode: extracted || undefined,
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId ? { ...s, messages: [...s.messages, interventionMsg] } : s
+        )
+      );
+
+      if (extracted) setActiveCanvas(extracted);
+    } catch {
+      try {
+        const cascadeResult = await callActiveGeminiCascade(
+          "Conduct a master synthesis on the discussion so far, resolving conflicts with clear next steps.",
+          messages
+        );
+        const extracted = extractCodeBlock(cascadeResult.text);
+        const sanitized = sanitizeGenieOutput(cascadeResult.text);
+
+        const interventionMsg: Message = {
+          role: "assistant",
+          content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
+          senderName: `Personal AI Genie (${cascadeResult.model})`,
+          isIntervention: true,
+          extractedCode: extracted || undefined,
+        };
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === currentSessionId ? { ...s, messages: [...s.messages, interventionMsg] } : s
+          )
+        );
+
+        if (extracted) setActiveCanvas(extracted);
+      } catch {
+        const fallbackMsg: Message = {
+          role: "assistant",
+          content: `[★ Verified Synthesis]\n\nAfter reviewing the team discussion history, all attendee requirements have been compiled into a unified roadmap.`,
+          senderName: "Personal AI Genie",
+          isIntervention: true,
+        };
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === currentSessionId ? { ...s, messages: [...s.messages, fallbackMsg] } : s
+          )
+        );
+      }
+    } finally {
+      setIsStreaming(false);
+    }
+  }
+
+  async function handleSendMessage(e?: React.FormEvent, forceRainbowTrigger = false, customText?: string) {
+    if (e) e.preventDefault();
+    const textToSend = customText !== undefined ? customText : prompt;
+    if (!textToSend.trim() && !forceRainbowTrigger) return;
+    if (isStreaming) return;
+
+    if (isQuotaEnforced && dailyUsageCount >= DAILY_FREE_LIMIT) {
+      setQuotaExceededModalOpen(true);
+      return;
+    }
+
+    const actualText = textToSend.trim() || (forceRainbowTrigger ? "Genie, please analyze the conversation and assist." : "");
+    const sentReplyTarget = replyTarget;
+
+    setPrompt("");
+    setReplyTarget(null);
+    setEmojiPickerOpen(false);
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
+    const userMsg: Message = {
+      role: "user",
+      content: actualText,
+      senderName: isTeamMode ? userProfile.name : undefined,
+      senderEmail: isTeamMode ? userProfile.email : undefined,
+      replyTo: sentReplyTarget || undefined,
+      triggeredByRainbow: forceRainbowTrigger,
+    };
+
+    const updatedMessages = [...messages, userMsg];
+
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id === currentSessionId) {
+          const updatedTitle = s.messages.length === 0 ? actualText.slice(0, 24) : s.title;
+          return { ...s, title: updatedTitle, messages: updatedMessages };
+        }
+        return s;
+      })
+    );
+
+    if (isQuotaEnforced) {
+      const newCount = dailyUsageCount + 1;
+      setDailyUsageCount(newCount);
+      if (userProfile.email && typeof window !== "undefined") {
+        const today = new Date().toISOString().split("T")[0];
+        localStorage.setItem(`genie_quota_${userProfile.email}_${today}`, newCount.toString());
+      }
+    }
+
+    const shouldWakeGenie =
+      !isTeamMode ||
+      forceRainbowTrigger ||
+      isObserverActive ||
+      checkWakeWordTrigger(actualText);
+
+    if (!shouldWakeGenie) return;
+
+    setIsStreaming(true);
+
+    let finalReply = "";
+    let finalModel = "gemini-2.5-flash";
+
+    // 18-second maximum budget for the backend before immediate fallback
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_email: userProfile.email,
+          prompt: actualText,
+          space_mode: spaceMode,
+          conversation_history: updatedMessages,
+          provider: "gemini",
+          models_cascade: ["gemini-2.5-flash", "gemini-2.0-flash"],
+          custom_api_key: userProfile.customApiKey || undefined,
+          profession_context:
+            userProfile.role === "professional" ? userProfile.profession : undefined,
+          gender_context: userProfile.gender,
+          language_code: selectedLang.code,
+          is_team_chat: isTeamMode,
+          is_observer_active: isObserverActive,
+          quoted_message: sentReplyTarget
+            ? { author: sentReplyTarget.author, content: sentReplyTarget.content }
+            : undefined,
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      finalReply = data.reply;
+      finalModel = data.model_used || "gemini-2.5-flash";
+    } catch {
+      clearTimeout(timeoutId);
+
+      // Fast Client-Side Parallel Race fallback
+      try {
+        const cascadeResult = await callActiveGeminiCascade(
+          actualText,
+          updatedMessages
+        );
+        finalReply = cascadeResult.text;
+        finalModel = cascadeResult.model;
+        setActiveModelName(cascadeResult.model);
+      } catch {
+        if (selectedLang.code === "ta-IN") {
+          finalReply = `வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. உங்கள் கேள்விக்கு பதில் அளிக்க தயாராக உள்ளேன். தயவுசெய்து உங்கள் Gemini API Key-ஐ Settings > BYOK-இல் சரிபார்க்கவும்.`;
+        } else {
+          finalReply = `I am reviewing your request regarding "${actualText}". For real-time responses, verify your Gemini API key under Preferences > BYOK.`;
+        }
+      }
+    } finally {
+      const extracted = extractCodeBlock(finalReply);
+      const sanitized = sanitizeGenieOutput(finalReply);
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId
+            ? {
+                ...s,
+                messages: [
+                  ...s.messages,
+                  {
+                    role: "assistant",
+                    content: sanitized,
+                    senderName: `Personal AI Genie`,
+                    modelUsed: finalModel,
+                    extractedCode: extracted || undefined,
+                  },
+                ],
+              }
+            : s
+        )
+      );
+
+      if (extracted) {
+        setActiveCanvas(extracted);
+      }
+      // Guaranteed spinner termination
+      setIsStreaming(false);
+    }
+  }
 }
 
 export default function Home() {
