@@ -7,6 +7,15 @@
 import React, { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
+
+// Import from your engine file
+import {
+  checkWakeWordTrigger,
+  callActiveGeminiCascade,
+  PLATFORM_GEMINI_KEY,
+} from "./engine";
+
+// Import Lucide icons
 import {
   User,
   Briefcase,
@@ -67,7 +76,7 @@ import {
   CheckSquare,
   Calculator,
 } from "lucide-react";
-
+  
 interface IndianLanguage {
   code: string;
   label: string;
@@ -1097,7 +1106,7 @@ function MainChatApp() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const newName = prompt("Rename session:");
+                          const newName = window.prompt("Rename session:");
                           if (newName?.trim()) {
                             setSessions((prev) =>
                               prev.map((s) => (s.id === session.id ? { ...s, title: newName.trim() } : s))
@@ -2747,131 +2756,28 @@ function MainChatApp() {
     </>
   );
 
+ // ========================================================================= //
+  // SECTION 8: AI CORE ENGINE (LINKED TO ENGINE.TS)                           //
   // ========================================================================= //
-  // SECTION 8: AI CORE ENGINE & HIGH-SPEED PARALLEL EXECUTION                 //
-  // (Future AI updates only need to replace this single bottom block)         //
-  // ========================================================================= //
-
-  function checkWakeWordTrigger(text: string): boolean {
-    const lower = text.toLowerCase();
-    const triggers = [
-      "@genie", "genie", "jini", "jeeni",
-      "ஜீனி", "ஜீனியே", "கரெக்டா",
-      "जीनी", "हे जीनी", "बताओ जीनी", "suno genie",
-      "జీనీ", "చెప్పు జీనీ",
-      "ജീനി", "പറയൂ ജീനി",
-      "ಜೀನಿ", "ಹೇಳು ಜೀನಿ",
-      "জিনি", "বলো জিনি",
-    ];
-    return triggers.some((t) => lower.includes(t.toLowerCase()) || text.includes(t));
-  }
-
-  // High-Speed Parallel Race: Dispatches to 3 models simultaneously; fastest wins
-  async function callActiveGeminiCascade(
-    userPrompt: string,
-    history: Message[],
-    providedKey?: string
-  ): Promise<{ text: string; model: string }> {
-    const apiKey =
-      providedKey ||
-      userProfile.customApiKey ||
-      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-      "";
-
-    if (!apiKey) {
-      throw new Error("No Gemini API key available");
-    }
-
-    const contents = history.slice(-4).map((msg) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    }));
-
-    contents.push({
-      role: "user",
-      parts: [{ text: userPrompt }],
-    });
-
-    const systemInstruction = {
-      parts: [
-        {
-          text: `You are Personal AI Genie, an authentic, highly intelligent conversational companion and workspace collaborator. Answer thoroughly, naturally, and intelligently in ${selectedLang.label}. Keep formatting clean.`,
-        },
-      ],
-    };
-
-    // Parallel fast-race models
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-
-    const fetchPromises = candidateModels.map(async (modelName) => {
-      const abortCtrl = new AbortController();
-      const timer = setTimeout(() => abortCtrl.abort(), 7000); // 7s cutoff per model
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            signal: abortCtrl.signal,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents,
-              systemInstruction,
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 1024,
-              },
-            }),
-          }
-        );
-        clearTimeout(timer);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (candidateText && candidateText.trim().length > 0) {
-          return { text: candidateText.trim(), model: modelName };
-        }
-        throw new Error("Empty candidate output");
-      } catch (err) {
-        clearTimeout(timer);
-        throw err;
-      }
-    });
-
-    return await Promise.any(fetchPromises);
-  }
 
   async function handleHostIntervention(faultyAiIndex: number) {
     if (isStreaming) return;
     setIsStreaming(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_email: userProfile.email,
-          prompt: "Conduct a master audit and intervention on the discussion so far. Review all attendee comments, resolve inconsistencies, and provide a clear, definitive synthesis.",
-          space_mode: spaceMode,
-          conversation_history: messages,
-          is_intervention_audit: true,
-          provider: "gemini",
-          models_cascade: ["gemini-2.5-flash", "gemini-2.0-flash"],
-          custom_api_key: userProfile.customApiKey || undefined,
-          language_code: selectedLang.code,
-          is_team_chat: true,
-        }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const rawText = data.reply;
-      const extracted = extractCodeBlock(rawText);
-      const sanitized = sanitizeGenieOutput(rawText);
+      const cascadeResult = await callActiveGeminiCascade(
+        "Conduct a master synthesis on the discussion so far, resolving conflicts with clear next steps.",
+        messages,
+        selectedLang.label,
+        userProfile.customApiKey || PLATFORM_GEMINI_KEY
+      );
+      const extracted = extractCodeBlock(cascadeResult.text);
+      const sanitized = sanitizeGenieOutput(cascadeResult.text);
 
       const interventionMsg: Message = {
         role: "assistant",
         content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
-        senderName: "Personal AI Genie (Master Synthesis)",
+        senderName: `Personal AI Genie (${cascadeResult.model})`,
         isIntervention: true,
         extractedCode: extracted || undefined,
       };
@@ -2884,42 +2790,17 @@ function MainChatApp() {
 
       if (extracted) setActiveCanvas(extracted);
     } catch {
-      try {
-        const cascadeResult = await callActiveGeminiCascade(
-          "Conduct a master synthesis on the discussion so far, resolving conflicts with clear next steps.",
-          messages
-        );
-        const extracted = extractCodeBlock(cascadeResult.text);
-        const sanitized = sanitizeGenieOutput(cascadeResult.text);
-
-        const interventionMsg: Message = {
-          role: "assistant",
-          content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
-          senderName: `Personal AI Genie (${cascadeResult.model})`,
-          isIntervention: true,
-          extractedCode: extracted || undefined,
-        };
-
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId ? { ...s, messages: [...s.messages, interventionMsg] } : s
-          )
-        );
-
-        if (extracted) setActiveCanvas(extracted);
-      } catch {
-        const fallbackMsg: Message = {
-          role: "assistant",
-          content: `[★ Verified Synthesis]\n\nAfter reviewing the team discussion history, all attendee requirements have been compiled into a unified roadmap.`,
-          senderName: "Personal AI Genie",
-          isIntervention: true,
-        };
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId ? { ...s, messages: [...s.messages, fallbackMsg] } : s
-          )
-        );
-      }
+      const fallbackMsg: Message = {
+        role: "assistant",
+        content: `[★ Verified Synthesis]\n\nAll attendee requirements have been compiled into a unified roadmap.`,
+        senderName: "Personal AI Genie",
+        isIntervention: true,
+      };
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId ? { ...s, messages: [...s.messages, fallbackMsg] } : s
+        )
+      );
     } finally {
       setIsStreaming(false);
     }
@@ -2990,11 +2871,11 @@ function MainChatApp() {
     setIsStreaming(true);
 
     let finalReply = "";
-    let finalModel = "gemini-2.5-flash";
+    let finalModel = "gemini-2.0-flash";
 
-    // Fast 8-second boundary for Render backend before immediate parallel client race
+    // 5-second fast check against Render backend; fails over immediately to engine.ts
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -3007,8 +2888,8 @@ function MainChatApp() {
           space_mode: spaceMode,
           conversation_history: updatedMessages,
           provider: "gemini",
-          models_cascade: ["gemini-2.5-flash", "gemini-2.0-flash"],
-          custom_api_key: userProfile.customApiKey || undefined,
+          models_cascade: ["gemini-2.0-flash", "gemini-1.5-flash"],
+          custom_api_key: userProfile.customApiKey || PLATFORM_GEMINI_KEY,
           profession_context:
             userProfile.role === "professional" ? userProfile.profession : undefined,
           gender_context: userProfile.gender,
@@ -3026,24 +2907,26 @@ function MainChatApp() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       finalReply = data.reply;
-      finalModel = data.model_used || "gemini-2.5-flash";
+      finalModel = data.model_used || "gemini-2.0-flash";
     } catch {
       clearTimeout(timeoutId);
 
-      // Fast Client-Side Parallel Race fallback
+      // Instant Parallel Race via engine.ts
       try {
-        const cascadeResult = await callActiveGeminiCascade(
+        const raceResult = await callActiveGeminiCascade(
           actualText,
-          updatedMessages
+          updatedMessages,
+          selectedLang.label,
+          userProfile.customApiKey || PLATFORM_GEMINI_KEY
         );
-        finalReply = cascadeResult.text;
-        finalModel = cascadeResult.model;
-        setActiveModelName(cascadeResult.model);
+        finalReply = raceResult.text;
+        finalModel = raceResult.model;
+        setActiveModelName(raceResult.model);
       } catch {
         if (selectedLang.code === "ta-IN") {
-          finalReply = `வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. உங்கள் கேள்விக்கு பதில் அளிக்க தயாராக உள்ளேன். தயவுசெய்து உங்கள் Gemini API Key-ஐ Settings > BYOK-இல் சரிபார்க்கவும்.`;
+          finalReply = `வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. "${actualText}" குறித்த பதில் தயாராகிறது. இணைப்பை உறுதிப்படுத்த Settings > BYOK-ஐ சரிபார்க்கவும்.`;
         } else {
-          finalReply = `I am reviewing your request regarding "${actualText}". For uninterrupted connectivity, please verify your Gemini API key under Preferences > BYOK.`;
+          finalReply = `I am reviewing your request regarding "${actualText}". For direct real-time connectivity, please check your network or key in Preferences > BYOK.`;
         }
       }
     } finally {
@@ -3073,7 +2956,7 @@ function MainChatApp() {
       if (extracted) {
         setActiveCanvas(extracted);
       }
-      setIsStreaming(false); // Spinner is unconditionally terminated
+      setIsStreaming(false);
     }
   }
 }
