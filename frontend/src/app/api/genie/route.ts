@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge"; // Ultra-low latency Vercel Edge Runtime
-
 const PLATFORM_GEMINI_KEY =
   process.env.GEMINI_API_KEY ||
   process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
@@ -14,12 +12,13 @@ const PLATFORM_OPENROUTER_KEY =
 
 export async function POST(req: Request) {
   try {
-    const { prompt, history, languageLabel, customApiKey } = await req.json();
+    const body = await req.json();
+    const { prompt, history, languageLabel, customApiKey } = body;
 
     const geminiKey = customApiKey || PLATFORM_GEMINI_KEY;
     const systemPrompt = `You are Personal AI Genie, an authentic, highly intelligent conversational companion and workspace collaborator. Answer thoroughly, clearly, and directly in ${languageLabel || "English"}. Keep explanations natural, prominent, and helpful.`;
 
-    // 1. Google Gemini Direct Caller
+    // 1. Google Gemini Direct REST Caller
     const callGemini = async (model: string): Promise<{ text: string; model: string }> => {
       const contents = (history || []).slice(-4).map((msg: any) => ({
         role: msg.role === "assistant" ? "model" : "user",
@@ -39,11 +38,11 @@ export async function POST(req: Request) {
           }),
         }
       );
-      if (!res.ok) throw new Error(`Gemini status ${res.status}`);
+      if (!res.ok) throw new Error(`Gemini ${model} HTTP ${res.status}`);
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text && text.trim()) return { text: text.trim(), model };
-      throw new Error("Empty text from Gemini");
+      throw new Error(`Empty response from ${model}`);
     };
 
     // 2. OpenRouter Direct Caller
@@ -69,29 +68,29 @@ export async function POST(req: Request) {
           max_tokens: 1500,
         }),
       });
-      if (!res.ok) throw new Error(`OpenRouter status ${res.status}`);
+      if (!res.ok) throw new Error(`OpenRouter ${model} HTTP ${res.status}`);
       const data = await res.json();
       const text = data.choices?.[0]?.message?.content;
       if (text && text.trim()) {
         const shortName = model.includes("/") ? model.split("/")[1] : model;
         return { text: text.trim(), model: `OpenRouter (${shortName})` };
       }
-      throw new Error("Empty text from OpenRouter");
+      throw new Error(`Empty response from ${model}`);
     };
 
-    // Parallel Fast Race across 4 endpoints
+    // Race Gemini 2.0, Gemini 1.5, and OpenRouter in parallel
     const result = await Promise.any([
-      callGemini("gemini-2.5-flash"),
       callGemini("gemini-2.0-flash"),
+      callGemini("gemini-1.5-flash"),
       callOpenRouter("google/gemini-2.0-flash-001"),
       callOpenRouter("meta-llama/llama-3.3-70b-instruct"),
     ]);
 
     return NextResponse.json({ success: true, reply: result.text, model: result.model });
-  } catch (error: any) {
-    console.error("Genie Edge Route Error:", error);
+  } catch (err: any) {
+    console.error("Genie API Route Error:", err);
     return NextResponse.json(
-      { success: false, error: error.message || "Execution failed" },
+      { success: false, error: err.message || "Failed to generate response" },
       { status: 500 }
     );
   }
