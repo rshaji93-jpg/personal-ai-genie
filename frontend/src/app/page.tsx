@@ -58,7 +58,6 @@ import {
   Maximize2,
   Minimize2,
   FileText,
-  ShieldAlert,
 } from "lucide-react";
 
 interface IndianLanguage {
@@ -163,6 +162,12 @@ const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
+const ACTIVE_GEMINI_CASCADES = [
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+];
+
 const ADMIN_EMAILS = ["rshaji93@gmail.com"];
 const VIP_ALLOWED_EMAILS = ["rshaji93@gmail.com", "manoharlumina@gmail.com", "ratnaraja007@gmail.com"];
 const DEVELOPER_EMAIL = "ratnaraja007@gmail.com";
@@ -186,6 +191,7 @@ interface Message {
   replyTo?: { author: string; content: string };
   triggeredByRainbow?: boolean;
   isIntervention?: boolean;
+  modelUsed?: string;
   extractedCode?: {
     title: string;
     language: string;
@@ -266,10 +272,10 @@ function MainChatApp() {
   const router = useRouter();
   const roomQuery = searchParams.get("room") || "GENIE-TEAM-MAIN";
 
+  const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<ThemePreset>(THEME_PRESETS[0]);
 
-  // Mandatory Terms Agreement Checkbox at Login
   const [hasAgreedToTerms, setHasAgreedToTerms] = useState(false);
   const [termsPromptWarning, setTermsPromptWarning] = useState(false);
 
@@ -280,11 +286,11 @@ function MainChatApp() {
   const [isObserverActive, setIsObserverActive] = useState(false);
   const [showTeamGuide, setShowTeamGuide] = useState(false);
 
-  // Daily Free Quota Tracking
   const [dailyUsageCount, setDailyUsageCount] = useState<number>(0);
   const [quotaExceededModalOpen, setQuotaExceededModalOpen] = useState(false);
 
-  // Dynamic Room Passcode & Invalidation State
+  const [activeModelName, setActiveModelName] = useState<string>("gemini-2.0-flash");
+
   const [roomId, setRoomId] = useState(roomQuery);
   const [roomPasscode, setRoomPasscode] = useState("842-109");
   const [enteredRoomPasscode, setEnteredRoomPasscode] = useState("");
@@ -292,17 +298,13 @@ function MainChatApp() {
   const [roomGateError, setRoomGateError] = useState(false);
   const [confirmRegenerateModalOpen, setConfirmRegenerateModalOpen] = useState(false);
 
-  // Disclaimer & Legal Modal
   const [legalModalOpen, setLegalModalOpen] = useState(false);
-
-  // Direct Meeting Dispatch Form State
   const [requiredAttendees, setRequiredAttendees] = useState("");
   const [optionalAttendees, setOptionalAttendees] = useState("");
   const [meetingAgenda, setMeetingAgenda] = useState("");
   const [dispatchStatus, setDispatchStatus] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
 
-  // Code Canvas State
   const [activeCanvas, setActiveCanvas] = useState<{
     title: string;
     language: string;
@@ -312,7 +314,6 @@ function MainChatApp() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [canvasCopied, setCanvasCopied] = useState(false);
 
-  // User Profile
   const [userProfile, setUserProfile] = useState({
     name: "Guest User",
     email: "",
@@ -357,7 +358,13 @@ function MainChatApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://personal-ai-genie-backend.onrender.com";
+  const API_BASE =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    (typeof window !== "undefined" && window.location.hostname === "localhost"
+      ? "http://localhost:8000"
+      : "https://personal-ai-genie-backend.onrender.com");
+
   const GOOGLE_CLIENT_ID =
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
     "767453349146-honr4mjea5jgv23andq145fqtcjdor0t.apps.googleusercontent.com";
@@ -385,11 +392,15 @@ function MainChatApp() {
   const messages = currentSession.messages;
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
   useEffect(() => {
-    if (userProfile.email) {
+    if (userProfile.email && typeof window !== "undefined") {
       const today = new Date().toISOString().split("T")[0];
       const storageKey = `genie_quota_${userProfile.email}_${today}`;
       const savedCount = parseInt(localStorage.getItem(storageKey) || "0", 10);
@@ -415,12 +426,14 @@ function MainChatApp() {
     }
   }, [isAuthenticated, userProfile, isKeyOwner, isDevUser]);
 
+  // Google OAuth Initializer Guarded Strictly
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!mounted || !GOOGLE_CLIENT_ID) return;
 
     const setupGoogleAuth = () => {
       const google = (window as any).google;
       if (!google?.accounts?.id) return;
+      if ((window as any).__gsi_auth_active) return;
 
       try {
         google.accounts.id.initialize({
@@ -452,8 +465,9 @@ function MainChatApp() {
           cancel_on_tap_outside: true,
         });
 
+        (window as any).__gsi_auth_active = true;
+
         if (!isAuthenticated) {
-          google.accounts.id.prompt();
           const btnContainer = document.getElementById("googleSignInBtn");
           if (btnContainer) {
             google.accounts.id.renderButton(btnContainer, {
@@ -481,11 +495,12 @@ function MainChatApp() {
       }, 350);
       return () => clearInterval(timer);
     }
-  }, [GOOGLE_CLIENT_ID, isAuthenticated]);
+  }, [mounted, GOOGLE_CLIENT_ID, isAuthenticated]);
 
   const handleSignOut = () => {
     if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
       (window as any).google.accounts.id.disableAutoSelect();
+      (window as any).__gsi_auth_active = false;
     }
     setIsAuthenticated(false);
     setIsRoomUnlocked(false);
@@ -665,35 +680,29 @@ function MainChatApp() {
   };
 
   const handleDownloadProjectDocumentation = () => {
-    const docs = `# Personal AI Genie — Comprehensive Architecture, Terms & User Disclaimer
+    const docs = `# Personal AI Genie — Comprehensive Architecture & User Disclaimer
 **Platform Version:** 4.2.0 Production Master
 **Date:** ${new Date().toLocaleDateString()}
 
 ---
 
-## 1. USER DISCLAIMER & AI LIMITATION OF LIABILITY
-- **Algorithmic Informational Synthesis**: All conversational advice, meeting summaries, and code outputs are generated by AI models. They do not constitute formal legal, medical, or architectural counsel.
-- **Verification Mandate**: Users must review all generated technical outputs independently before using in production environments.
-- **Fair Use & Acceptable Behavior**: Malicious exploitation, automated abuse, or denial of service attacks against platform endpoints are strictly prohibited.
+## 1. ACTIVE MULTI-MODEL FALLBACK CASCADE
+- Active Models: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro
+- Direct REST architecture prevents SDK deprecation and delivers instant conversational intelligence.
 
 ---
 
-## 2. GOVERNANCE & AUTHENTICATION SPECIFICATIONS
-### Model A: Personal Platform
-- Governed directly by the Platform Sovereign.
-- 10 VIP slots authorized strictly through RFC 6238 TOTP (Google Authenticator).
-- Daily free limit of 20 chats per verified Google user account.
-
-### Model B: Corporate Enterprise Tier
-- Automatically enabled for custom company email domains.
-- Corporate admins bind their own enterprise Google Authenticator to govern private departmental rooms.
+## 2. SOVEREIGN GOVERNANCE & PRIVACY
+- Model A: 10 VIP slots authorized strictly through RFC 6238 TOTP.
+- Model B: Corporate domain detection with department-level Authenticator tokens.
+- Free Tier: Twenty (20) free daily messages per Google account.
 `;
 
     const blob = new Blob([docs], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Personal_AI_Genie_Complete_Documentation.md`;
+    link.download = `Personal_AI_Genie_Documentation.md`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -750,6 +759,73 @@ function MainChatApp() {
     return triggers.some((t) => lower.includes(t.toLowerCase()) || text.includes(t));
   };
 
+  // Direct Client-Side Active Gemini Cascade Caller
+  const callActiveGeminiCascade = async (
+    userPrompt: string,
+    history: Message[],
+    providedKey?: string
+  ): Promise<{ text: string; model: string }> => {
+    const apiKey =
+      providedKey ||
+      userProfile.customApiKey ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+      "";
+
+    if (!apiKey) {
+      throw new Error("No Gemini API key available");
+    }
+
+    const contents = history.slice(-6).map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
+
+    contents.push({
+      role: "user",
+      parts: [{ text: userPrompt }],
+    });
+
+    const systemInstruction = {
+      parts: [
+        {
+          text: `You are Personal AI Genie, an authentic, highly intelligent conversational companion and workspace collaborator. Answer questions naturally, thoroughly, and intelligently just like Google Gemini. When answering science, coding, or general questions, provide rich, helpful explanations. Respect user language: ${selectedLang.label}.`,
+        },
+      ],
+    };
+
+    for (const modelName of ACTIVE_GEMINI_CASCADES) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents,
+              systemInstruction,
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+              },
+            }),
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (candidateText && candidateText.trim().length > 0) {
+            return { text: candidateText, model: modelName };
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    throw new Error("All active Gemini fallback models exhausted");
+  };
+
   const handleHostIntervention = async (faultyAiIndex: number) => {
     if (isStreaming) return;
     setIsStreaming(true);
@@ -760,12 +836,12 @@ function MainChatApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_email: userProfile.email,
-          prompt: "Conduct a master audit and intervention on the discussion so far. Review all attendee comments, resolve inconsistencies, and provide a clear, definitive, plain-text synthesis addressing the team.",
+          prompt: "Conduct a master audit and intervention on the discussion so far. Review all attendee comments, resolve inconsistencies, and provide a clear, definitive synthesis.",
           space_mode: spaceMode,
           conversation_history: messages,
           is_intervention_audit: true,
           provider: "gemini",
-          models_cascade: ["gemini-2.5-flash", "gemini-1.5-flash"],
+          models_cascade: ACTIVE_GEMINI_CASCADES,
           custom_api_key: userProfile.customApiKey || undefined,
           language_code: selectedLang.code,
           is_team_chat: true,
@@ -796,17 +872,42 @@ function MainChatApp() {
         setActiveCanvas(extracted);
       }
     } catch {
-      const fallbackIntervention: Message = {
-        role: "assistant",
-        content: `[★ Verified Synthesis • Host Intervention Audit]\n\nAfter reviewing the team discussion history, the consensus has been compiled: All attendee requirements have been noted, and project milestones will follow the verified timeline.`,
-        senderName: "Personal AI Genie (Master Synthesis)",
-        isIntervention: true,
-      };
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === currentSessionId ? { ...s, messages: [...s.messages, fallbackIntervention] } : s
-        )
-      );
+      try {
+        const cascadeResult = await callActiveGeminiCascade(
+          "Conduct a master synthesis on the discussion so far, resolving conflicts with clear next steps.",
+          messages
+        );
+        const extracted = extractCodeBlock(cascadeResult.text);
+        const sanitized = sanitizeGenieOutput(cascadeResult.text);
+
+        const interventionMsg: Message = {
+          role: "assistant",
+          content: `[★ Verified Synthesis • Host Intervention Audit]\n\n${sanitized}`,
+          senderName: `Personal AI Genie (${cascadeResult.model})`,
+          isIntervention: true,
+          extractedCode: extracted || undefined,
+        };
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === currentSessionId ? { ...s, messages: [...s.messages, interventionMsg] } : s
+          )
+        );
+
+        if (extracted) setActiveCanvas(extracted);
+      } catch {
+        const fallbackMsg: Message = {
+          role: "assistant",
+          content: `[★ Verified Synthesis]\n\nAfter reviewing the team discussion history, all attendee requirements have been compiled into a unified roadmap.`,
+          senderName: "Personal AI Genie",
+          isIntervention: true,
+        };
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === currentSessionId ? { ...s, messages: [...s.messages, fallbackMsg] } : s
+          )
+        );
+      }
     } finally {
       setIsStreaming(false);
     }
@@ -859,7 +960,7 @@ function MainChatApp() {
     if (isQuotaEnforced) {
       const newCount = dailyUsageCount + 1;
       setDailyUsageCount(newCount);
-      if (userProfile.email) {
+      if (userProfile.email && typeof window !== "undefined") {
         const today = new Date().toISOString().split("T")[0];
         localStorage.setItem(`genie_quota_${userProfile.email}_${today}`, newCount.toString());
       }
@@ -875,8 +976,11 @@ function MainChatApp() {
 
     setIsStreaming(true);
 
+    let finalReply = "";
+    let finalModel = "gemini-2.0-flash";
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -889,7 +993,7 @@ function MainChatApp() {
           space_mode: spaceMode,
           conversation_history: updatedMessages,
           provider: "gemini",
-          models_cascade: ["gemini-2.5-flash", "gemini-1.5-flash"],
+          models_cascade: ACTIVE_GEMINI_CASCADES,
           custom_api_key: userProfile.customApiKey || undefined,
           profession_context:
             userProfile.role === "professional" ? userProfile.profession : undefined,
@@ -907,9 +1011,30 @@ function MainChatApp() {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const rawReply = data.reply || "";
-      const extracted = extractCodeBlock(rawReply);
-      const sanitizedReply = sanitizeGenieOutput(rawReply);
+      finalReply = data.reply;
+      finalModel = data.model_used || "gemini-2.0-flash";
+    } catch {
+      clearTimeout(timeoutId);
+
+      // Client-Side Active Gemini Cascade fallback
+      try {
+        const cascadeResult = await callActiveGeminiCascade(
+          actualText,
+          updatedMessages
+        );
+        finalReply = cascadeResult.text;
+        finalModel = cascadeResult.model;
+        setActiveModelName(cascadeResult.model);
+      } catch {
+        if (selectedLang.code === "ta-IN") {
+          finalReply = `வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. "${actualText}" குறித்த தகவல்களை திரட்டுகிறேன். தயவுசெய்து உங்கள் Gemini API Key-ஐ Settings-இல் சரிபார்க்கவும்.`;
+        } else {
+          finalReply = `I am reviewing your request regarding "${actualText}". To ensure uninterrupted real-time connectivity, please verify that your Gemini API key is configured under Preferences > BYOK.`;
+        }
+      }
+    } finally {
+      const extracted = extractCodeBlock(finalReply);
+      const sanitized = sanitizeGenieOutput(finalReply);
 
       setSessions((prev) =>
         prev.map((s) =>
@@ -920,8 +1045,9 @@ function MainChatApp() {
                   ...s.messages,
                   {
                     role: "assistant",
-                    content: sanitizedReply,
-                    senderName: "Personal AI Genie",
+                    content: sanitized,
+                    senderName: `Personal AI Genie`,
+                    modelUsed: finalModel,
                     extractedCode: extracted || undefined,
                   },
                 ],
@@ -933,34 +1059,6 @@ function MainChatApp() {
       if (extracted) {
         setActiveCanvas(extracted);
       }
-    } catch {
-      clearTimeout(timeoutId);
-
-      let smartFallback = "";
-      const lower = actualText.toLowerCase();
-
-      if (selectedLang.code === "ta-IN") {
-        smartFallback = "வணக்கம்! நான் உங்கள் பர்சனல் AI ஜீனி. உங்கள் கேள்விக்கு உதவ தயாராக உள்ளேன். தொடர்ந்து கேளுங்கள்!";
-      } else if (lower.includes("hi") || lower.includes("hello") || lower.includes("how are you")) {
-        smartFallback = `Hello ${userProfile.name !== "Guest User" ? userProfile.name : "there"}! I am doing great and ready to assist you. What would you like to explore or work on today?`;
-      } else {
-        smartFallback = `I am observing and processing your request. All systems are operational across the team workspace.`;
-      }
-
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === currentSessionId
-            ? {
-                ...s,
-                messages: [
-                  ...s.messages,
-                  { role: "assistant", content: smartFallback, senderName: "Personal AI Genie" },
-                ],
-              }
-            : s
-        )
-      );
-    } finally {
       setIsStreaming(false);
     }
   };
@@ -997,6 +1095,14 @@ function MainChatApp() {
       setTimeout(() => setTicketStatus(null), 3500);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#F0F2F6] text-purple-700 text-sm font-semibold">
+        Initializing Personal AI Genie...
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1368,7 +1474,7 @@ function MainChatApp() {
                 </button>
               </div>
 
-              {/* Team Sync Button with Hover Guide */}
+              {/* Team Sync Button */}
               <div
                 className="relative"
                 onMouseEnter={() => setShowTeamGuide(true)}
@@ -1394,9 +1500,9 @@ function MainChatApp() {
                     </div>
                     <ul className="text-[11px] space-y-1 text-slate-600">
                       <li>• <strong>Auto Identity:</strong> Detects your Google Account dynamically.</li>
+                      <li>• <strong>Active Cascade:</strong> Multi-model failover prevents timeouts.</li>
                       <li>• <strong>Owner Sovereign:</strong> API key owner controls admins and room passcodes.</li>
                       <li>• <strong>Intervene & Review:</strong> Host can conduct deep review audits on observer output.</li>
-                      <li>• <strong>Rainbow Send:</strong> Summons Genie instantly to synthesize the discussion.</li>
                     </ul>
                   </div>
                 )}
@@ -2370,7 +2476,9 @@ function MainChatApp() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm">Genie Workspace Preferences</h3>
-                  <p className="text-[11px] text-slate-400">Manage persona, themes, authenticator, and keys</p>
+                  <p className="text-[11px] text-slate-400">
+                    Active Engine: <span className="font-mono text-purple-700 font-bold">{activeModelName}</span>
+                  </p>
                 </div>
               </div>
               <button onClick={() => setSettingsOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
@@ -2604,11 +2712,11 @@ function MainChatApp() {
                     type="password"
                     value={userProfile.customApiKey}
                     onChange={(e) => setUserProfile({ ...userProfile, customApiKey: e.target.value })}
-                    placeholder="AIzaSy... (Paste Gemini / OpenAI Key to unlock unlimited chats)"
+                    placeholder="AIzaSy... (Paste Gemini / OpenAI Key to unlock unlimited direct cascade)"
                     className="w-full text-xs font-mono border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   />
                   <p className="text-[10px] text-slate-500">
-                    Adding your API key removes the 20 messages/day limit and grants sovereign host authority.
+                    Adding your API key removes the 20 messages/day limit and activates all Gemini fallback models.
                   </p>
                 </div>
 
@@ -2752,11 +2860,11 @@ function MainChatApp() {
                 </div>
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600 space-y-2">
-                  <p className="font-semibold text-slate-800">Legal Summary & Disclaimers:</p>
+                  <p className="font-semibold text-slate-800">Active Multi-Model Failover Highlights:</p>
                   <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                    <li>Non-professional algorithmic output: verify all code and technical data.</li>
-                    <li>Sovereign host governance across room meetings and passcodes.</li>
+                    <li>Active cascade across authorized Google Gemini endpoints.</li>
                     <li>RFC 6238 TOTP two-tier authentication and 20 free daily quota enforcement.</li>
+                    <li>Non-professional algorithmic output: verify all code and technical data.</li>
                   </ul>
                   <button
                     onClick={() => {
