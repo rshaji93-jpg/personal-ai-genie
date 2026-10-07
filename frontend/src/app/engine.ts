@@ -77,15 +77,15 @@ export async function callActiveGeminiCascade(
     throw new Error(`Empty response from ${model}`);
   };
 
-  // Primary: gemini-2.5-flash -> Fallback 1: gemini-2.0-flash -> Fallback 2: gemini-1.5-flash
-  const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  // Active models suggested by Google API error logs
+  const modelsToTry = ["gemini-3.8-flash", "gemini-2.5-flash"];
   let lastError: any = null;
 
   for (const model of modelsToTry) {
     try {
       return await executeGeminiCall(model);
     } catch (err) {
-      console.warn(`Model ${model} failed, trying next...`, err);
+      console.warn(`Model ${model} failed, attempting next model...`, err);
       lastError = err;
     }
   }
