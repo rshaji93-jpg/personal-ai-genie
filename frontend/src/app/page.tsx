@@ -392,10 +392,28 @@ function MainChatApp() {
   const currentSession = sessions.find((s) => s.id === currentSessionId) || sessions[0];
   const messages = currentSession.messages;
 
+  // Restore authenticated session from localStorage on initial load
   useEffect(() => {
     setMounted(true);
-    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-      setSidebarOpen(true);
+    if (typeof window !== "undefined") {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true);
+      }
+
+      const savedAuth = localStorage.getItem("genie_is_authenticated");
+      const savedProfile = localStorage.getItem("genie_user_profile");
+      const savedAgreed = localStorage.getItem("genie_terms_agreed");
+
+      if (savedAuth === "true" && savedProfile) {
+        try {
+          const parsedProfile = JSON.parse(savedProfile);
+          setUserProfile((prev) => ({ ...prev, ...parsedProfile }));
+          setIsAuthenticated(true);
+          setHasAgreedToTerms(savedAgreed === "true");
+        } catch (e) {
+          console.error("Session restoration error", e);
+        }
+      }
     }
   }, []);
 
@@ -430,6 +448,7 @@ function MainChatApp() {
     }
   }, [isAuthenticated, userProfile, isKeyOwner, isDevUser]);
 
+  // Google OAuth Initializer with persistent session caching
   useEffect(() => {
     if (!mounted || !GOOGLE_CLIENT_ID) return;
 
@@ -453,13 +472,27 @@ function MainChatApp() {
               );
               const data = JSON.parse(jsonPayload);
 
-              setUserProfile((prev) => ({
-                ...prev,
-                name: data.name || prev.name,
-                email: data.email || prev.email,
+              const updatedProfile = {
+                name: data.name || "User",
+                email: data.email || "",
                 avatarUrl: data.picture || "",
-              }));
+                role: "professional" as const,
+                profession: "Healthcare Revenue Cycle & Client Operations",
+                ageGroup: "pro",
+                gender: "male",
+                customApiKey: "",
+                totpPasscode: "",
+              };
+
+              setUserProfile((prev) => ({ ...prev, ...updatedProfile }));
               setIsAuthenticated(true);
+              setHasAgreedToTerms(true);
+
+              if (typeof window !== "undefined") {
+                localStorage.setItem("genie_is_authenticated", "true");
+                localStorage.setItem("genie_user_profile", JSON.stringify(updatedProfile));
+                localStorage.setItem("genie_terms_agreed", "true");
+              }
             } catch (err) {
               console.error("Token decoding error", err);
             }
@@ -501,9 +534,14 @@ function MainChatApp() {
   }, [mounted, GOOGLE_CLIENT_ID, isAuthenticated]);
 
   const handleSignOut = () => {
-    if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
-      (window as any).google.accounts.id.disableAutoSelect();
-      (window as any).__gsi_auth_active = false;
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("genie_is_authenticated");
+      localStorage.removeItem("genie_user_profile");
+      localStorage.removeItem("genie_terms_agreed");
+      if ((window as any).google?.accounts?.id) {
+        (window as any).google.accounts.id.disableAutoSelect();
+        (window as any).__gsi_auth_active = false;
+      }
     }
     setIsAuthenticated(false);
     setIsRoomUnlocked(false);
