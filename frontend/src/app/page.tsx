@@ -282,7 +282,7 @@ function MainChatApp() {
   const [termsPromptWarning, setTermsPromptWarning] = useState(false);
 
   const [spaceMode, setSpaceMode] = useState<"personal" | "workspace">("personal");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDockHidden, setIsDockHidden] = useState(false);
   const [isTeamMode, setIsTeamMode] = useState(Boolean(searchParams.get("room")));
   const [isObserverActive, setIsObserverActive] = useState(false);
@@ -395,6 +395,9 @@ function MainChatApp() {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setSidebarOpen(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -475,7 +478,7 @@ function MainChatApp() {
             google.accounts.id.renderButton(btnContainer, {
               theme: "outline",
               size: "large",
-              width: 320,
+              width: 300,
               text: "continue_with",
               shape: "pill",
             });
@@ -683,7 +686,7 @@ function MainChatApp() {
 
   const handleDownloadProjectDocumentation = () => {
     const docs = `# Personal AI Genie — Comprehensive Architecture & User Disclaimer
-**Platform Version:** 4.2.0 Production Master
+**Platform Version:** 4.7.0 Production Master
 **Date:** ${new Date().toLocaleDateString()}
 
 ---
@@ -1248,11 +1251,19 @@ function MainChatApp() {
 
       {/* Main Layout */}
       <div className="flex h-screen w-full overflow-hidden bg-[#F0F2F6] text-slate-800 antialiased font-sans">
+        {/* Mobile Backdrop Overlay */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-30 bg-black/40 backdrop-blur-xs lg:hidden"
+          />
+        )}
+
         {/* Sidebar */}
         <aside
           className={`${
-            sidebarOpen ? "w-72" : "w-0 -translate-x-full lg:w-0"
-          } fixed inset-y-0 left-0 z-40 bg-[#E9ECF2]/95 backdrop-blur-xl border-r border-[#D9DFEA] transition-all duration-300 ease-in-out lg:static flex flex-col overflow-hidden`}
+            sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full w-0 lg:w-0"
+          } fixed lg:static inset-y-0 left-0 z-40 bg-[#E9ECF2]/95 backdrop-blur-xl border-r border-[#D9DFEA] transition-all duration-300 ease-in-out flex flex-col overflow-hidden shadow-2xl lg:shadow-none`}
         >
           <div className="flex items-center justify-between p-4 border-b border-[#D9DFEA]">
             <div className="flex items-center gap-3">
@@ -1284,6 +1295,9 @@ function MainChatApp() {
                   ...prev,
                 ]);
                 setCurrentSessionId(newId);
+                if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                  setSidebarOpen(false);
+                }
               }}
               className={`w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold ${selectedTheme.primaryClass} text-white rounded-xl transition-all shadow-sm`}
             >
@@ -1299,7 +1313,12 @@ function MainChatApp() {
             {sessions.map((session) => (
               <div
                 key={session.id}
-                onClick={() => setCurrentSessionId(session.id)}
+                onClick={() => {
+                  setCurrentSessionId(session.id);
+                  if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                    setSidebarOpen(false);
+                  }
+                }}
                 className={`group relative flex items-center justify-between px-3 py-2 text-xs rounded-xl cursor-pointer transition-all ${
                   currentSessionId === session.id
                     ? `bg-white ${selectedTheme.textClass} font-semibold shadow-sm border border-[#D9DFEA]`
@@ -1440,7 +1459,7 @@ function MainChatApp() {
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed top-4 left-3 z-50 p-2 bg-white/90 hover:bg-white text-slate-700 rounded-xl shadow-md border border-slate-200 transition-all"
+            className="fixed top-3 left-3 z-30 p-2 bg-white/95 hover:bg-white text-slate-700 rounded-xl shadow-md border border-slate-200 transition-all"
             title="Open Sidebar"
           >
             <ChevronRight className="w-4 h-4" />
@@ -1449,49 +1468,50 @@ function MainChatApp() {
 
         {/* Main Work Area */}
         <main className="flex flex-1 flex-col h-full min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
-          <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-[#DDE3EE] bg-white/70 backdrop-blur-md z-10 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className={`flex items-center p-1 bg-white rounded-full border-2 ${selectedTheme.borderClass} shadow-sm`}>
+          {/* Responsive Header */}
+          <header className="flex-shrink-0 flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#DDE3EE] bg-white/80 backdrop-blur-md z-10 shadow-xs gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar pl-10 lg:pl-0">
+              <div className={`flex items-center p-0.5 sm:p-1 bg-white rounded-full border ${selectedTheme.borderClass} shadow-xs shrink-0`}>
                 <button
                   onClick={() => setSpaceMode("personal")}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all ${
                     spaceMode === "personal"
-                      ? `${selectedTheme.primaryClass} text-white shadow-sm`
+                      ? `${selectedTheme.primaryClass} text-white shadow-xs`
                       : "text-slate-600 hover:text-slate-900 font-medium"
                   }`}
                 >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Genie Personal Space</span>
+                  <User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <span>Personal</span>
                 </button>
 
                 <button
                   onClick={() => setSpaceMode("workspace")}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all ${
                     spaceMode === "workspace"
-                      ? `${selectedTheme.primaryClass} text-white shadow-sm`
+                      ? `${selectedTheme.primaryClass} text-white shadow-xs`
                       : "text-slate-600 hover:text-slate-900 font-medium"
                   }`}
                 >
-                  <Briefcase className="w-3.5 h-3.5" />
-                  <span>Genie Workspace</span>
+                  <Briefcase className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <span>Workspace</span>
                 </button>
               </div>
 
               {/* Team Sync Button */}
               <div
-                className="relative"
+                className="relative shrink-0"
                 onMouseEnter={() => setShowTeamGuide(true)}
                 onMouseLeave={() => setShowTeamGuide(false)}
               >
                 <button
                   onClick={handleToggleTeamMode}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold border transition-all ${
                     isTeamMode
-                      ? "bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 text-white border-transparent shadow-sm"
+                      ? "bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 text-white border-transparent shadow-xs"
                       : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  <Users className="w-3.5 h-3.5" />
+                  <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>{isTeamMode ? "Team Active" : "Team Sync"}</span>
                 </button>
 
@@ -1514,29 +1534,29 @@ function MainChatApp() {
               {isTeamMode && (
                 <button
                   onClick={() => setRoomAdminOpen(true)}
-                  className={`px-2.5 py-1 text-[11px] font-semibold bg-white border ${selectedTheme.borderClass} ${selectedTheme.textClass} hover:${selectedTheme.bgLightClass} rounded-full transition-all shadow-xs`}
+                  className={`shrink-0 px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold bg-white border ${selectedTheme.borderClass} ${selectedTheme.textClass} hover:${selectedTheme.bgLightClass} rounded-full transition-all shadow-xs`}
                 >
                   Roster ({members.filter((m) => m.status === "active").length}/50)
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-pink-700 bg-pink-50 px-3.5 py-1.5 rounded-full border-2 border-pink-500 shadow-sm flex items-center gap-1">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <span className="hidden sm:flex text-xs font-bold text-pink-700 bg-pink-50 px-3 py-1 rounded-full border border-pink-400 shadow-xs items-center gap-1">
                 {isCorporateDomain ? (
                   <>
-                    <Building2 className="w-3.5 h-3.5 text-pink-600" /> Corporate Domain Active
+                    <Building2 className="w-3.5 h-3.5 text-pink-600" /> Corp Active
                   </>
                 ) : spaceMode === "workspace" ? (
-                  "Organizational Workspace"
+                  "Workspace"
                 ) : (
-                  "Google Personal Account"
+                  "Personal"
                 )}
               </span>
 
               <button
                 onClick={() => setSettingsOpen(true)}
-                className={`p-2 bg-white text-slate-600 hover:${selectedTheme.textClass} hover:${selectedTheme.bgLightClass} border border-slate-200 rounded-full transition-all shadow-sm`}
+                className={`p-1.5 sm:p-2 bg-white text-slate-600 hover:${selectedTheme.textClass} hover:${selectedTheme.bgLightClass} border border-slate-200 rounded-full transition-all shadow-xs`}
                 title="Workspace Preferences"
               >
                 <SettingsIcon className="w-4 h-4" />
@@ -1547,9 +1567,9 @@ function MainChatApp() {
           {/* Messages & Canvas Workspace */}
           <div className="flex-1 min-h-0 flex relative overflow-hidden">
             {/* Chat Thread */}
-            <div className={`flex-1 min-h-0 overflow-y-auto px-4 py-6 transition-all ${activeCanvas ? "w-1/2 pr-2" : "w-full"}`}>
+            <div className={`flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 transition-all ${activeCanvas ? "w-1/2 pr-2" : "w-full"}`}>
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center">
+                <div className="h-full flex flex-col items-center justify-center text-center px-4">
                   <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white shadow-md border border-[#DCE2ED] p-0.5 mb-4">
                     <GenieAvatar
                       src={userProfile.avatarUrl}
@@ -1557,7 +1577,7 @@ function MainChatApp() {
                       className="w-full h-full rounded-full"
                     />
                   </div>
-                  <h2 className="text-3xl font-semibold tracking-tight text-slate-900 mb-2">
+                  <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900 mb-2">
                     Where should we start?
                   </h2>
                   <p className="text-xs text-slate-500 max-w-sm">
@@ -1838,7 +1858,7 @@ function MainChatApp() {
 
           {/* Collapsible Chat Input Dock with Disclaimers & Quota Controls */}
           {!isDockHidden && (
-            <div className="flex-shrink-0 w-full px-4 py-3 bg-white/80 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300">
+            <div className="flex-shrink-0 w-full px-2 sm:px-4 py-2 sm:py-3 bg-white/80 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300">
               {replyTarget && (
                 <div className={`max-w-3xl mx-auto mb-2 flex items-center justify-between p-2 ${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} rounded-xl text-xs`}>
                   <div className="truncate">
@@ -1852,18 +1872,18 @@ function MainChatApp() {
               )}
 
               {/* Status Header: Team Mode or 20 Daily Free Quota Pill */}
-              <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between px-3 py-1.5 bg-slate-50/90 border border-slate-200 rounded-xl text-[11px]">
+              <div className="max-w-3xl mx-auto mb-1.5 sm:mb-2 flex items-center justify-between px-2.5 sm:px-3 py-1 bg-slate-50/90 border border-slate-200 rounded-xl text-[10px] sm:text-[11px]">
                 {isTeamMode ? (
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 text-white shadow-xs">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 text-white shadow-xs">
                       <Users className="w-3 h-3" />
-                      <span>Team Active • {userProfile.name}</span>
+                      <span className="truncate max-w-[120px] sm:max-w-none">Team • {userProfile.name}</span>
                     </span>
 
                     <button
                       type="button"
                       onClick={() => setIsObserverActive(!isObserverActive)}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all ${
+                      className={`flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-bold border transition-all ${
                         isObserverActive
                           ? "bg-emerald-100 text-emerald-800 border-emerald-300 shadow-xs"
                           : "bg-white text-slate-500 border-slate-200 hover:bg-slate-100"
@@ -1876,12 +1896,12 @@ function MainChatApp() {
                 ) : (
                   <div className="flex items-center gap-2">
                     {isQuotaEnforced ? (
-                      <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${remainingDailyChats > 5 ? "bg-purple-100 text-purple-800" : "bg-amber-100 text-amber-800"}`}>
+                      <span className={`flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold ${remainingDailyChats > 5 ? "bg-purple-100 text-purple-800" : "bg-amber-100 text-amber-800"}`}>
                         <Sparkles className="w-3 h-3" />
-                        <span>⚡ Free Quota: {remainingDailyChats} / {DAILY_FREE_LIMIT} Chats Remaining Today</span>
+                        <span>⚡ {remainingDailyChats} / {DAILY_FREE_LIMIT} Chats Left</span>
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      <span className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-emerald-100 text-emerald-800">
                         <ShieldCheck className="w-3 h-3" />
                         <span>★ {isVipUser ? "VIP Unlimited" : "BYOK Unlimited"}</span>
                       </span>
@@ -1889,24 +1909,24 @@ function MainChatApp() {
                   </div>
                 )}
 
-                <span className={`text-[10px] ${selectedTheme.textClass} font-semibold truncate`}>
-                  Type @Genie or use Rainbow Send to synthesize
+                <span className={`hidden xs:inline text-[10px] ${selectedTheme.textClass} font-semibold truncate`}>
+                  Type @Genie to query
                 </span>
               </div>
 
               <div className="w-full max-w-3xl mx-auto relative">
                 {/* Emoji Bar with Tooltips */}
                 {emojiPickerOpen && (
-                  <div className="absolute left-10 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 flex items-center gap-2">
+                  <div className="absolute left-2 sm:left-10 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 sm:p-3 z-50 flex items-center gap-1 sm:gap-2 overflow-x-auto max-w-[95vw]">
                     {QUICK_EMOJIS.map((emoji) => (
-                      <div key={emoji.symbol} className="relative group">
+                      <div key={emoji.symbol} className="relative group shrink-0">
                         <button
                           type="button"
                           onClick={() => {
                             setPrompt((prev) => prev + emoji.symbol);
                             setEmojiPickerOpen(false);
                           }}
-                          className="text-lg hover:scale-125 transition-transform p-1 rounded-lg hover:bg-slate-100"
+                          className="text-base sm:text-lg hover:scale-125 transition-transform p-1 rounded-lg hover:bg-slate-100"
                         >
                           {emoji.symbol}
                         </button>
@@ -1920,7 +1940,7 @@ function MainChatApp() {
 
                 <form
                   onSubmit={(e) => handleSendMessage(e, false)}
-                  className="w-full flex items-center bg-white border border-slate-200/90 shadow-md rounded-full px-4 py-2 hover:shadow-lg focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all"
+                  className="w-full flex items-center bg-white border border-slate-200 shadow-md rounded-2xl sm:rounded-full px-2 sm:px-4 py-1.5 sm:py-2 hover:shadow-lg focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all gap-1 sm:gap-2"
                 >
                   <input
                     type="file"
@@ -1937,19 +1957,19 @@ function MainChatApp() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-slate-400 hover:text-slate-700 transition-colors"
+                    className="p-1 sm:p-2 text-slate-400 hover:text-slate-700 transition-colors shrink-0"
                     title="Attach file for analysis"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
-                    className="p-2 text-slate-400 hover:text-amber-500 transition-colors"
+                    className="p-1 sm:p-2 text-slate-400 hover:text-amber-500 transition-colors shrink-0"
                     title="Add quick emoji reaction"
                   >
-                    <Smile className="w-5 h-5" />
+                    <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
 
                   <input
@@ -1958,27 +1978,28 @@ function MainChatApp() {
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder={
                       isListening
-                        ? `Listening in ${selectedLang.label}... Speak naturally`
+                        ? `Listening in ${selectedLang.label}...`
                         : isTeamMode
-                        ? `Message team or summon Genie...`
+                        ? `Message team or @Genie...`
                         : isQuotaEnforced && remainingDailyChats === 0
-                        ? "Daily quota reached. Add BYOK key to continue..."
-                        : "Ask Genie anything (or ask a coding question)..."
+                        ? "Daily quota reached..."
+                        : "Ask Genie anything..."
                     }
                     disabled={isQuotaEnforced && remainingDailyChats === 0}
-                    className="flex-1 bg-transparent px-3 text-slate-900 placeholder-slate-400 text-sm focus:outline-none disabled:opacity-50"
+                    className="flex-1 min-w-0 bg-transparent px-1 sm:px-3 text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none disabled:opacity-50"
                   />
 
-                  <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setLangMenuOpen(!langMenuOpen)}
-                        className={`flex items-center gap-1 text-[11px] font-semibold ${selectedTheme.textClass} ${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} px-2 py-1 rounded-full transition-colors`}
+                        className={`flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-[11px] font-semibold ${selectedTheme.textClass} ${selectedTheme.bgLightClass} border ${selectedTheme.borderClass} px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full transition-colors`}
                       >
                         <Globe className="w-3 h-3" />
-                        <span>{selectedLang.label}</span>
-                        <ChevronDown className="w-3 h-3" />
+                        <span className="hidden sm:inline">{selectedLang.label}</span>
+                        <span className="sm:hidden">{selectedLang.code.split("-")[0].toUpperCase()}</span>
+                        <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       </button>
 
                       {langMenuOpen && (
@@ -2008,24 +2029,24 @@ function MainChatApp() {
                     <button
                       type="button"
                       onClick={toggleListening}
-                      className={`p-2 rounded-full transition-all ${
+                      className={`p-1.5 sm:p-2 rounded-full transition-all shrink-0 ${
                         isListening
                           ? "bg-rose-100 text-rose-600 ring-2 ring-rose-400 animate-pulse"
                           : "text-slate-500 hover:text-slate-800"
                       }`}
                       title={isListening ? "Stop listening" : `Dictate in ${selectedLang.label}`}
                     >
-                      {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </button>
 
                     {/* Standard Send Button */}
                     <button
                       type="submit"
                       disabled={!prompt.trim() || isStreaming || (isQuotaEnforced && remainingDailyChats === 0)}
-                      className={`p-2 bg-gradient-to-r ${selectedTheme.gradientClass} text-white rounded-full disabled:opacity-40 transition-all shadow-sm`}
+                      className={`p-1.5 sm:p-2 bg-gradient-to-r ${selectedTheme.gradientClass} text-white rounded-full disabled:opacity-40 transition-all shadow-xs shrink-0`}
                       title="Send message"
                     >
-                      <Send className="w-4 h-4" />
+                      <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
 
                     {/* Rainbow Send Button */}
@@ -2034,10 +2055,10 @@ function MainChatApp() {
                         type="button"
                         onClick={(e) => handleSendMessage(e, true)}
                         disabled={isStreaming || (isQuotaEnforced && remainingDailyChats === 0)}
-                        className="p-2 bg-gradient-to-r from-violet-600 via-pink-500 via-amber-400 to-emerald-400 text-white rounded-full hover:scale-105 transition-all shadow-sm animate-pulse"
+                        className="p-1.5 sm:p-2 bg-gradient-to-r from-violet-600 via-pink-500 via-amber-400 to-emerald-400 text-white rounded-full hover:scale-105 transition-all shadow-xs animate-pulse shrink-0"
                         title="Rainbow Send: Prompt Genie to observe and respond immediately"
                       >
-                        <Sparkles className="w-4 h-4" />
+                        <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     )}
 
@@ -2045,7 +2066,7 @@ function MainChatApp() {
                     <button
                       type="button"
                       onClick={() => setIsDockHidden(true)}
-                      className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full transition-colors ml-0.5"
+                      className="hidden sm:block p-1.5 text-slate-400 hover:text-slate-700 rounded-full transition-colors shrink-0"
                       title="Hide chat dock"
                     >
                       <ChevronDown className="w-4 h-4" />
@@ -2054,16 +2075,16 @@ function MainChatApp() {
                 </form>
 
                 {/* Visible User Disclaimer & Terms Notification */}
-                <div className="flex items-center justify-center gap-2 mt-2 select-none">
-                  <p className="text-[11px] text-slate-400 font-normal">
-                    Personal AI Genie can make mistakes. Please verify important information.
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-1.5 sm:mt-2 select-none text-[10px] sm:text-[11px] text-slate-400">
+                  <p className="truncate">
+                    Personal AI Genie can make mistakes.
                   </p>
-                  <span className="text-slate-300">•</span>
+                  <span>•</span>
                   <button
                     onClick={() => setLegalModalOpen(true)}
-                    className="text-[11px] text-purple-600 hover:underline font-semibold"
+                    className="text-purple-600 hover:underline font-semibold shrink-0"
                   >
-                    Terms & User Disclaimer
+                    Terms & Disclaimer
                   </button>
                 </div>
               </div>
@@ -2489,11 +2510,11 @@ function MainChatApp() {
               </button>
             </div>
 
-            <div className="flex border-b border-slate-200 bg-slate-50/80 px-6 pt-2 gap-2 flex-shrink-0">
+            <div className="flex border-b border-slate-200 bg-slate-50/80 px-4 sm:px-6 pt-2 gap-2 flex-shrink-0 overflow-x-auto no-scrollbar">
               <button
                 type="button"
                 onClick={() => setSettingsTab("profile")}
-                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
                   settingsTab === "profile"
                     ? `border-purple-600 ${selectedTheme.textClass}`
                     : "border-transparent text-slate-500 hover:text-slate-800"
@@ -2506,7 +2527,7 @@ function MainChatApp() {
               <button
                 type="button"
                 onClick={() => setSettingsTab("theme")}
-                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
                   settingsTab === "theme"
                     ? `border-purple-600 ${selectedTheme.textClass}`
                     : "border-transparent text-slate-500 hover:text-slate-800"
@@ -2519,7 +2540,7 @@ function MainChatApp() {
               <button
                 type="button"
                 onClick={() => setSettingsTab("developer")}
-                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
                   settingsTab === "developer"
                     ? `border-purple-600 ${selectedTheme.textClass}`
                     : "border-transparent text-slate-500 hover:text-slate-800"
@@ -2532,7 +2553,7 @@ function MainChatApp() {
               <button
                 type="button"
                 onClick={() => setSettingsTab("totp")}
-                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
                   settingsTab === "totp"
                     ? `border-purple-600 ${selectedTheme.textClass}`
                     : "border-transparent text-slate-500 hover:text-slate-800"
@@ -2545,7 +2566,7 @@ function MainChatApp() {
               <button
                 type="button"
                 onClick={() => setSettingsTab("docs")}
-                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
                   settingsTab === "docs"
                     ? `border-purple-600 ${selectedTheme.textClass}`
                     : "border-transparent text-slate-500 hover:text-slate-800"
