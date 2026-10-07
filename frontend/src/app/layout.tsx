@@ -3,7 +3,19 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Personal AI Genie",
-  description: "Cross-platform high-performance workspace assistant",
+  description: "Autonomous Multi-User Workspace & Personal AI Companion",
+  metadataBase: new URL("https://personal-ai-canvas.vercel.app"),
+  openGraph: {
+    title: "Personal AI Genie",
+    description: "Autonomous Multi-User Workspace & Personal AI Companion",
+    url: "https://personal-ai-canvas.vercel.app",
+    siteName: "Personal AI Genie",
+    locale: "en_US",
+    type: "website",
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export const viewport: Viewport = {
