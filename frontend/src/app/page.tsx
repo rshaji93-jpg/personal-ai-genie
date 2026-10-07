@@ -76,7 +76,7 @@ import {
   CheckSquare,
   Calculator,
 } from "lucide-react";
-  
+
 interface IndianLanguage {
   code: string;
   label: string;
@@ -303,7 +303,7 @@ function MainChatApp() {
 
   const [dailyUsageCount, setDailyUsageCount] = useState<number>(0);
   const [quotaExceededModalOpen, setQuotaExceededModalOpen] = useState(false);
-  const [activeModelName, setActiveModelName] = useState<string>("gemini-2.5-flash");
+  const [activeModelName, setActiveModelName] = useState<string>("gemini-3.8-flash");
 
   const [roomId, setRoomId] = useState(roomQuery);
   const [roomPasscode, setRoomPasscode] = useState("842-109");
@@ -373,12 +373,14 @@ function MainChatApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const API_BASE =
+  // Strip any trailing slashes cleanly
+  const rawApiBase =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     (typeof window !== "undefined" && window.location.hostname === "localhost"
       ? "http://localhost:8000"
-      : "https://personal-ai-genie-backend.onrender.com");
+      : "https://personal-ai-genie.onrender.com");
+  const API_BASE = rawApiBase.trim().replace(/\/+$/, "");
 
   const GOOGLE_CLIENT_ID =
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
@@ -987,9 +989,7 @@ function MainChatApp() {
           />
         )}
 
-        {/* ========================================================================= //
-        // SECTION 3: SIDEBAR & CONVERSATION HISTORY                                 //
-        // ========================================================================= */}
+        {/* SECTION 3: SIDEBAR */}
         <aside
           className={`${
             sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full w-0 lg:w-0"
@@ -1196,9 +1196,7 @@ function MainChatApp() {
           </button>
         )}
 
-        {/* ========================================================================= //
-        // SECTION 4: TOP HEADER & WORKSPACE NAVIGATION                              //
-        // ========================================================================= */}
+        {/* SECTION 4: MAIN HEADER & WORKSPACE */}
         <main className="flex flex-1 flex-col h-full min-h-0 min-w-0 relative overflow-hidden bg-gradient-to-b from-[#F2F4F8] via-[#EFF2F7] to-[#E9EDF4]">
           <header className="flex-shrink-0 flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 border-b border-[#DDE3EE] bg-white/80 backdrop-blur-md z-10 shadow-xs gap-2">
             <div className="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar pl-10 lg:pl-0">
@@ -1256,7 +1254,7 @@ function MainChatApp() {
                       <li>• <strong>Auto Identity:</strong> Detects your Google Account dynamically.</li>
                       <li>• <strong>Active Cascade:</strong> Multi-model failover prevents timeouts.</li>
                       <li>• <strong>Owner Sovereign:</strong> API key owner controls admins and room passcodes.</li>
-                      <li>• <strong>Intervene & Review:</strong> Host can conduct deep review audits on observer output.</li>
+                      <li>• <strong>Intervene & Review:</strong> Conduct audits on observer output directly.</li>
                     </ul>
                   </div>
                 )}
@@ -1295,9 +1293,7 @@ function MainChatApp() {
             </div>
           </header>
 
-          {/* ========================================================================= //
-          // SECTION 5: CHAT THREAD & CODE CANVAS PANELS                               //
-          // ========================================================================= */}
+          {/* SECTION 5: CHAT THREAD & CANVAS */}
           <div className="flex-1 min-h-0 flex relative overflow-hidden">
             <div className={`flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 transition-all ${activeCanvas ? "w-1/2 pr-2" : "w-full"}`}>
               {messages.length === 0 ? (
@@ -1583,9 +1579,7 @@ function MainChatApp() {
             </div>
           )}
 
-          {/* ========================================================================= //
-          // SECTION 6: CHAT INPUT DOCK & ATTACHMENT CONTROLS                          //
-          // ========================================================================= */}
+          {/* SECTION 6: CHAT INPUT DOCK */}
           {!isDockHidden && (
             <div className="flex-shrink-0 w-full px-2 sm:px-4 py-2 sm:py-3 bg-white/95 backdrop-blur-md border-t border-[#DDE3EE] shadow-lg transition-transform duration-300 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {replyTarget && (
@@ -1644,7 +1638,6 @@ function MainChatApp() {
               </div>
 
               <div className="w-full max-w-3xl mx-auto relative">
-                {/* Clean Professional & Student Focused Attachment Dock */}
                 {attachmentMenuOpen && (
                   <div className="absolute left-2 bottom-full mb-3 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 w-72 text-slate-800 animate-in fade-in zoom-in-95">
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
@@ -1662,7 +1655,6 @@ function MainChatApp() {
                     </div>
 
                     <div className="space-y-1 text-xs">
-                      {/* Document Upload */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1678,7 +1670,6 @@ function MainChatApp() {
                         </div>
                       </button>
 
-                      {/* Role Specific Action Boosters */}
                       {userProfile.role === "student" ? (
                         <>
                           <button
@@ -1926,9 +1917,7 @@ function MainChatApp() {
 
                 {/* Visible User Disclaimer */}
                 <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-1.5 sm:mt-2 select-none text-[10px] sm:text-[11px] text-slate-400">
-                  <p className="truncate">
-                    Personal AI Genie can make mistakes.
-                  </p>
+                  <p className="truncate">Personal AI Genie can make mistakes.</p>
                   <span>•</span>
                   <button
                     onClick={() => setLegalModalOpen(true)}
@@ -1943,9 +1932,7 @@ function MainChatApp() {
         </main>
       </div>
 
-      {/* ========================================================================= //
-      // SECTION 7: MODALS & OVERLAYS (SETTINGS, BYOK, TOTP, GOVERNANCE, LEGAL)    //
-      // ========================================================================= */}
+      {/* SECTION 7: MODALS */}
       {legalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
           <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1970,7 +1957,7 @@ function MainChatApp() {
               <div>
                 <h4 className="font-bold text-slate-800 text-sm mb-1">2. AI Accuracy & Non-Professional Advice Disclaimer</h4>
                 <p>
-                  Outputs generated by Personal AI Genie are algorithmically synthesized using large language model inference. They are provided strictly for educational, organizational, and general productivity assistance. Outputs do NOT constitute professional medical, legal, financial, architectural, or security advice. Always verify mission-critical data independently.
+                  Outputs generated by Personal AI Genie are algorithmically synthesized using large language model inference. They are provided strictly for educational, organizational, and general productivity assistance. Outputs do NOT constitute professional medical, legal, financial, architectural, or security advice.
                 </p>
               </div>
 
@@ -1979,7 +1966,7 @@ function MainChatApp() {
                 <p>
                   - <strong>Free Quota</strong>: Standard consumer accounts receive twenty (20) interactions per rolling 24-hour cycle.
                   <br />
-                  - <strong>Bring Your Own Key (BYOK)</strong>: When supplying your own Gemini or OpenAI API keys, token billing and quota terms are directly between you and the respective model provider.
+                  - <strong>Bring Your Own Key (BYOK)</strong>: When supplying your own Gemini API keys, token billing and quota terms are directly between you and the respective model provider.
                   <br />
                   - <strong>Room Sovereignty</strong>: Meeting hosts hold sole authority over Room Security Passcodes, attendee delegation, and observer deep-review audits.
                 </p>
@@ -2577,11 +2564,11 @@ function MainChatApp() {
                     type="password"
                     value={userProfile.customApiKey}
                     onChange={(e) => setUserProfile({ ...userProfile, customApiKey: e.target.value })}
-                    placeholder="AIzaSy... (Paste Gemini / OpenAI Key to unlock unlimited direct cascade)"
+                    placeholder="AIzaSy... (Paste Gemini Key to unlock unlimited direct cascade)"
                     className="w-full text-xs font-mono border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   />
                   <p className="text-[10px] text-slate-500">
-                    Adding your API key removes the 20 messages/day limit and activates all Gemini fallback models.
+                    Adding your API key removes the 20 messages/day limit and activates all fallback models.
                   </p>
                 </div>
 
@@ -2756,8 +2743,8 @@ function MainChatApp() {
     </>
   );
 
- // ========================================================================= //
-  // SECTION 8: AI CORE ENGINE (LINKED TO ENGINE.TS)                           //
+  // ========================================================================= //
+  // SECTION 8: AI CORE ENGINE (LINKED TO ENGINE.TS & RENDER BACKEND)          //
   // ========================================================================= //
 
   async function handleHostIntervention(faultyAiIndex: number) {
@@ -2871,11 +2858,11 @@ function MainChatApp() {
     setIsStreaming(true);
 
     let finalReply = "";
-    let finalModel = "gemini-2.0-flash";
+    let finalModel = "gemini-3.8-flash";
 
-    // 5-second fast check against Render backend; fails over immediately to engine.ts
+    // Allow 45-second timeout to handle Render cold-start boots
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -2888,7 +2875,7 @@ function MainChatApp() {
           space_mode: spaceMode,
           conversation_history: updatedMessages,
           provider: "gemini",
-          models_cascade: ["gemini-2.0-flash", "gemini-1.5-flash"],
+          models_cascade: ["gemini-3.8-flash", "gemini-2.5-flash"],
           custom_api_key: userProfile.customApiKey || PLATFORM_GEMINI_KEY,
           profession_context:
             userProfile.role === "professional" ? userProfile.profession : undefined,
@@ -2907,7 +2894,7 @@ function MainChatApp() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       finalReply = data.reply;
-      finalModel = data.model_used || "gemini-2.0-flash";
+      finalModel = data.model_used || "gemini-3.8-flash";
     } catch {
       clearTimeout(timeoutId);
 
