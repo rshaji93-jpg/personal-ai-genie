@@ -10,6 +10,13 @@ const PLATFORM_OPENROUTER_KEY =
   process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ||
   "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";
 
+const GEMINI_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-2.0-flash",
+];
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -18,7 +25,7 @@ export async function POST(req: Request) {
     const geminiKey = customApiKey || PLATFORM_GEMINI_KEY;
     const systemPrompt = `You are Personal AI Genie, an authentic, highly intelligent conversational companion and workspace collaborator. Answer thoroughly, clearly, and directly in ${languageLabel || "English"}. Keep explanations natural, prominent, and helpful.`;
 
-    // 1. Google Gemini Direct REST Caller
+    // 1. Google Gemini Native Caller with Model Cascade
     const callGemini = async (model: string): Promise<{ text: string; model: string }> => {
       const contents = (history || []).slice(-4).map((msg: any) => ({
         role: msg.role === "assistant" ? "model" : "user",
@@ -45,7 +52,7 @@ export async function POST(req: Request) {
       throw new Error(`Empty response from ${model}`);
     };
 
-    // 2. OpenRouter Direct Caller
+    // 2. OpenRouter Fast Fallback Caller
     const callOpenRouter = async (model: string): Promise<{ text: string; model: string }> => {
       const messages = [
         { role: "system", content: systemPrompt },
@@ -78,10 +85,12 @@ export async function POST(req: Request) {
       throw new Error(`Empty response from ${model}`);
     };
 
-    // Race Gemini 2.0, Gemini 1.5, and OpenRouter in parallel
+    // Parallel multi-model dispatch across the 3.8/3.7/3.6 cascade and OpenRouter
     const result = await Promise.any([
-      callGemini("gemini-2.0-flash"),
-      callGemini("gemini-1.5-flash"),
+      callGemini(GEMINI_MODELS[0]),
+      callGemini(GEMINI_MODELS[1]),
+      callGemini(GEMINI_MODELS[2]),
+      callGemini(GEMINI_MODELS[3]),
       callOpenRouter("google/gemini-2.0-flash-001"),
       callOpenRouter("meta-llama/llama-3.3-70b-instruct"),
     ]);
