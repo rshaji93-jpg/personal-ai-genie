@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Mic, MicOff, ChevronDown, Send, Globe } from "lucide-react";
+import { StudentQuotesTicker, StudyRoomPresetGrid } from "./StudentSection";
 
 const INDIAN_LANGUAGES = [
   { code: "en-IN", label: "EN (India)" },
@@ -76,6 +77,16 @@ export default function ChatInput({
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4">
+      {/* Student Study Quotes Ticker & Room Presets */}
+      <div className="mb-2">
+        <StudentQuotesTicker
+          onSelectQuote={(q) => setPrompt(`Let's reflect on this quote: "${q.quote}"`)}
+        />
+        <StudyRoomPresetGrid
+          onSelectPreset={(p) => setPrompt(p.suggestedPrompt)}
+        />
+      </div>
+
       <form
         onSubmit={handleSubmit}
         className="w-full flex items-center bg-white border border-slate-200/90 shadow-md rounded-full px-4 py-2 hover:shadow-lg focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all"
@@ -179,4 +190,4 @@ export default function ChatInput({
       </form>
     </div>
   );
-}
+            }
