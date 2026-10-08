@@ -40,6 +40,17 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className="h-full min-h-[100dvh] w-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
         {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js').catch(() => {});
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
