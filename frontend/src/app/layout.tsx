@@ -2,24 +2,62 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Personal AI Genie",
-  description: "Autonomous Multi-User Workspace & Personal AI Companion",
-  metadataBase: new URL("https://personal-ai-canvas.vercel.app"),
+  title: "Personal AI Genie — Autonomous Workspace & AI Companion",
+  description:
+    "Autonomous Multi-User Workspace, Personal AI Companion, and Unified Study Engine powered by high-performance multi-model cascades.",
+  metadataBase: new URL("https://personal-ai-genie-ten.vercel.app"),
+  keywords: [
+    "Personal AI Genie",
+    "Personal AI Canvas",
+    "AI Study Engine",
+    "Autonomous Multi-User Workspace",
+    "Gemini AI Assistant",
+    "Unified Study Engine",
+    "Notes to Flashcards AI",
+    "AI Team Collaboration",
+  ],
+  authors: [{ name: "Personal AI Genie Team" }],
+  creator: "Personal AI Genie",
+  publisher: "Personal AI Genie",
+  applicationName: "Personal AI Genie",
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   manifest: "/manifest.json",
   openGraph: {
-    title: "Personal AI Genie",
-    description: "Autonomous Multi-User Workspace & Personal AI Companion",
+    title: "Personal AI Genie — Autonomous Workspace & AI Companion",
+    description:
+      "Autonomous Multi-User Workspace, Personal AI Companion, and Unified Study Engine.",
     url: "https://personal-ai-canvas.vercel.app",
     siteName: "Personal AI Genie",
     locale: "en_US",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Personal AI Genie",
+    description:
+      "Autonomous Multi-User Workspace, Personal AI Companion, and Unified Study Engine.",
+  },
   icons: {
-    icon: [
-      { url: "/icon.svg", type: "image/svg+xml" }
-    ],
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: "/icon.svg",
     apple: "/icon-512.png",
+  },
+  verification: {
+    // Paste your Google Search Console verification token below if you have one:
+    google: "",
   },
 };
 
