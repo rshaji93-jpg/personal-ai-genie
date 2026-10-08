@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     title: "Personal AI Genie — Autonomous Workspace & AI Companion",
     description:
       "Autonomous Multi-User Workspace, Personal AI Companion, and Unified Study Engine.",
-    url: "https://personal-ai-canvas.vercel.app",
+    url: "https://personal-ai-genie-ten.vercel.app",
     siteName: "Personal AI Genie",
     locale: "en_US",
     type: "website",
@@ -56,8 +56,7 @@ export const metadata: Metadata = {
     apple: "/icon-512.png",
   },
   verification: {
-    // Paste your Google Search Console verification token below if you have one:
-    google: "",
+    google: "NGxRq5mFXrJoHtH2lQSVC_47TEjiL654u7ktVqM32UI",
   },
 };
 
