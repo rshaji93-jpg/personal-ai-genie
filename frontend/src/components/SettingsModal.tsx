@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Settings, User, Key, ExternalLink, GraduationCap, Briefcase, Check } from "lucide-react";
+import { Download, FileUp } from "lucide-react";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -86,6 +87,66 @@ export default function SettingsModal({
                 </span>
               </div>
             </div>
+                    {/* Backup & Restore Utility */}
+        <div className="p-3 bg-white border border-slate-200 rounded-2xl space-y-2 mt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-800">
+              Chat Vault & Backup Safeguard
+            </span>
+            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">
+              Auto-Persist Active
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Export chat history to a JSON file or restore an earlier backup.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                const stored = localStorage.getItem("genie_chat_sessions_v2") || localStorage.getItem("genie_chat_sessions");
+                const blob = new Blob([stored || "[]"], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Genie_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export Backup</span>
+            </button>
+
+            <label className="flex-1 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+              <FileUp className="w-3.5 h-3.5" />
+              <span>Restore Backup</span>
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const content = event.target?.result as string;
+                        localStorage.setItem("genie_chat_sessions_v2", content);
+                        alert("Backup restored! Reloading application...");
+                        window.location.reload();
+                      } catch {
+                        alert("Invalid backup file.");
+                      }
+                    };
+                    reader.readAsText(file);
+                  }
+                }}
+              />
+            </label>
+          </div>
+        </div>
 
             {/* Persona Switch: Student vs Professional */}
             <div className="space-y-1.5">
