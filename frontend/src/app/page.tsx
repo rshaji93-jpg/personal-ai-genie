@@ -7,6 +7,7 @@
 import React, { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
+import StudentBanner from "../components/StudentBanner";
 
 // Import from your engine file
 import {
@@ -1773,7 +1774,7 @@ function MainChatApp() {
                     ))}
                   </div>
                 )}
-
+                <StudentBanner onSelectPrompt={(t) => setPrompt(t)} />
                 <form
                   onSubmit={(e) => handleSendMessage(e, false)}
                   className="w-full flex items-center bg-white border border-slate-200 shadow-md rounded-2xl sm:rounded-full px-2 sm:px-4 py-1.5 sm:py-2 hover:shadow-lg focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all gap-1 sm:gap-2"
