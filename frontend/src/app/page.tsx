@@ -48,8 +48,6 @@ import {
   Forward,
   UserCheck,
   UserX,
-  Download,
-  FileUp,
   ChevronDown,
   ChevronUp,
   Lock,
